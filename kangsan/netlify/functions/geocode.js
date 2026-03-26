@@ -1,12 +1,10 @@
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
     'Content-Type': 'application/json',
   };
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
-  if (event.httpMethod !== 'GET') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
 
   const query = event.queryStringParameters?.q;
   if (!query) return { statusCode: 400, headers, body: JSON.stringify({ error: 'q 파라미터 필요' }) };
@@ -30,57 +28,74 @@ exports.handler = async (event) => {
     } catch(e) { return null; }
   };
 
-  const vworld = async (q, type) => {
-    try {
-      const r = await fetch(`https://api.vworld.kr/req/address?service=address&request=getcoord&version=2.0&crs=epsg:4326&address=${encodeURIComponent(q)}&refine=true&simple=false&format=json&type=${type}&key=F4836B82-0E97-3B99-A518-C4BD1C9E9887`);
-      const d = await r.json();
-      if (d.response?.status === 'OK' && d.response.result?.point) return d.response.result.point;
-      return null;
-    } catch(e) { return null; }
+  // 경북 → 경상북도 등 시도명 변환
+  const expandProvince = (addr) => {
+    return addr
+      .replace(/^경북/, '경상북도')
+      .replace(/^경남/, '경상남도')
+      .replace(/^전북/, '전라북도')
+      .replace(/^전남/, '전라남도')
+      .replace(/^충북/, '충청북도')
+      .replace(/^충남/, '충청남도')
+      .replace(/^강원/, '강원도')
+      .replace(/^경기/, '경기도')
+      .replace(/^제주/, '제주특별자치도');
   };
 
-  const removeLot = (addr) => addr.replace(/\s+\d+(-\d+)?(\s.*)?$/, '').trim();
+  // 번지 제거
+  const removeLot = (addr) => addr.replace(/\s+\d+(-\d+)?$/, '').trim();
+  // 마지막 단위 제거
   const removeLastUnit = (addr) => { const p = addr.split(' '); return p.length > 2 ? p.slice(0, -1).join(' ') : addr; };
 
   try {
-    let doc, pt;
+    let doc;
+    const queries = [];
 
-    doc = await kakaoAddr(query);
-    if (doc) return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lat: parseFloat(doc.y), lon: parseFloat(doc.x), src: '카카오주소' }) };
-
-    doc = await kakaoKw(query);
-    if (doc) return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lat: parseFloat(doc.y), lon: parseFloat(doc.x), src: '카카오키워드' }) };
-
-    pt = await vworld(query, 'parcel');
-    if (pt) return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lat: parseFloat(pt.y), lon: parseFloat(pt.x), src: 'Vworld지번' }) };
-
-    pt = await vworld(query, 'road');
-    if (pt) return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lat: parseFloat(pt.y), lon: parseFloat(pt.x), src: 'Vworld도로명' }) };
-
+    // 원본
+    queries.push(query);
+    // 시도 풀네임으로 변환
+    const expanded = expandProvince(query);
+    if (expanded !== query) queries.push(expanded);
+    // 번지 제거
     const simple = removeLot(query);
     if (simple !== query) {
-      doc = await kakaoAddr(simple);
-      if (doc) return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lat: parseFloat(doc.y), lon: parseFloat(doc.x), src: '카카오번지제거' }) };
-
-      pt = await vworld(simple, 'parcel');
-      if (pt) return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lat: parseFloat(pt.y), lon: parseFloat(pt.x), src: 'Vworld번지제거' }) };
+      queries.push(simple);
+      queries.push(expandProvince(simple));
     }
-
+    // 리 단위만
     const region = removeLastUnit(simple);
     if (region !== simple) {
-      doc = await kakaoAddr(region);
-      if (doc) return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lat: parseFloat(doc.y), lon: parseFloat(doc.x), src: '카카오리단위' }) };
-
-      pt = await vworld(region, 'parcel');
-      if (pt) return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lat: parseFloat(pt.y), lon: parseFloat(pt.x), src: 'Vworld리단위' }) };
-
-      doc = await kakaoKw(region);
-      if (doc) return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lat: parseFloat(doc.y), lon: parseFloat(doc.x), src: '카카오리키워드' }) };
+      queries.push(region);
+      queries.push(expandProvince(region));
+    }
+    // 면 단위만
+    const region2 = removeLastUnit(region);
+    if (region2 !== region) {
+      queries.push(region2);
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: false, error: '검색 결과 없음' }) };
+    // 모든 변형으로 카카오 주소검색
+    for (const q of queries) {
+      doc = await kakaoAddr(q);
+      if (doc) return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lat: parseFloat(doc.y), lon: parseFloat(doc.x), src: `주소:${q}` }) };
+    }
+
+    // 모든 변형으로 카카오 키워드검색
+    for (const q of queries) {
+      doc = await kakaoKw(q);
+      if (doc) return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lat: parseFloat(doc.y), lon: parseFloat(doc.x), src: `키워드:${q}` }) };
+    }
+
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: false, error: '검색 결과 없음', tried: queries }) };
 
   } catch (err) {
     return { statusCode: 500, headers, body: JSON.stringify({ ok: false, error: err.message }) };
   }
 };
+```
+
+붙여넣기 후 **`Commit changes`** 클릭!
+
+배포 완료되면 브라우저에서 테스트:
+```
+https://gentle-rolypoly-88ed26.netlify.app/.netlify/functions/geocode?q=경북 포항시 북구 청하면 월포리 275-8
