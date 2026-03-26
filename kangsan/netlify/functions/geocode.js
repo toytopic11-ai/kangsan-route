@@ -93,9 +93,3 @@ exports.handler = async (event) => {
   }
 };
 ```
-
-붙여넣기 후 **`Commit changes`** 클릭!
-
-배포 완료되면 브라우저에서 테스트:
-```
-https://gentle-rolypoly-88ed26.netlify.app/.netlify/functions/geocode?q=경북 포항시 북구 청하면 월포리 275-8
