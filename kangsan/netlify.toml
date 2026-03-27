@@ -1,4 +1,3 @@
 [build]
-  base = "kangsan"
-  publish = "kangsan/public"
-  functions = "kangsan/netlify/functions"
+  publish = "public"
+  functions = "netlify/functions"
