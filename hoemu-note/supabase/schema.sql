@@ -362,6 +362,13 @@ begin
   end loop;
 end $$;
 
+-- ═══════════════ 앱(로그인 사용자) 접근 권한 ═══════════════
+-- 프로젝트 생성 시 'Automatically expose new tables' 를 꺼도 앱이 동작하도록 직접 부여
+-- (실제 데이터 접근은 위 RLS 로 본인 행만 허용, 비로그인(anon)은 권한 없음)
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+
 -- ═══════════════ 활동 기록 자동화 트리거 ═══════════════
 create or replace function public.log_activity(p_user uuid, p_org text, p_type text, p_title text, p_ref_type text, p_ref_id uuid)
 returns void language sql as $$
@@ -548,3 +555,6 @@ create policy docs_own_update on storage.objects for update to authenticated
   using (bucket_id = 'docs' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy docs_own_delete on storage.objects for delete to authenticated
   using (bucket_id = 'docs' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 함수 실행 권한(로그인 사용자만)
+grant execute on all functions in schema public to authenticated;
