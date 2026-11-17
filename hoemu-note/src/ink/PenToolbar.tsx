@@ -88,7 +88,7 @@ export function PenToolbar({
 
   const btn =
     "min-w-[44px] h-11 px-2 rounded-xl flex items-center justify-center gap-1 text-sm select-none transition";
-  const on = "bg-[#1e3a8a] text-white shadow";
+  const on = "bg-[#004098] text-white shadow";
   const off = "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200";
 
   return (
@@ -152,7 +152,7 @@ export function PenToolbar({
               onPointerDown={() => startLongPress(p.id)}
               onPointerUp={cancelLongPress}
               onPointerLeave={cancelLongPress}
-              className={`h-9 px-3 rounded-full text-xs flex items-center gap-1.5 border shrink-0 ${active ? "border-[#1e3a8a] ring-2 ring-[#1e3a8a]/30" : "border-slate-200"}`}
+              className={`h-9 px-3 rounded-full text-xs flex items-center gap-1.5 border shrink-0 ${active ? "border-[#004098] ring-2 ring-[#004098]/30" : "border-slate-200"}`}
             >
               <span
                 className="inline-block rounded-full"
@@ -189,7 +189,7 @@ export function PenToolbar({
                   type="button"
                   aria-label={c.name}
                   onClick={() => setColor(c.value)}
-                  className={`w-9 h-9 rounded-full border-2 ${color === c.value ? "border-[#1e3a8a] scale-110" : "border-white ring-1 ring-slate-200"}`}
+                  className={`w-9 h-9 rounded-full border-2 ${color === c.value ? "border-[#004098] scale-110" : "border-white ring-1 ring-slate-200"}`}
                   style={{ background: c.value }}
                 />
               ))}
@@ -216,7 +216,7 @@ export function PenToolbar({
                   key={s.name}
                   type="button"
                   onClick={() => setSize(s.value)}
-                  className={`h-9 px-2 rounded-lg text-xs border whitespace-nowrap shrink-0 ${size === s.value ? "border-[#1e3a8a] bg-blue-50" : "border-slate-200"}`}
+                  className={`h-9 px-2 rounded-lg text-xs border whitespace-nowrap shrink-0 ${size === s.value ? "border-[#004098] bg-blue-50" : "border-slate-200"}`}
                 >
                   {s.name}
                 </button>
@@ -228,7 +228,7 @@ export function PenToolbar({
               step={range.step}
               value={size}
               onChange={(e) => setSize(Number(e.target.value))}
-              className="flex-1 min-w-[60px] h-9 accent-[#1e3a8a]"
+              className="flex-1 min-w-[60px] h-9 accent-[#004098]"
               aria-label="굵기"
             />
             {/* 미리보기: 실제 선 모양 */}
@@ -274,7 +274,7 @@ export function PenToolbar({
               step={0.05}
               value={settings.penThinning}
               onChange={(e) => onChange({ penThinning: Number(e.target.value) })}
-              className="flex-1 accent-[#1e3a8a]"
+              className="flex-1 accent-[#004098]"
             />
           </label>
           <label className="flex items-center gap-2">
@@ -286,7 +286,7 @@ export function PenToolbar({
               step={0.05}
               value={settings.streamline}
               onChange={(e) => onChange({ streamline: Number(e.target.value) })}
-              className="flex-1 accent-[#1e3a8a]"
+              className="flex-1 accent-[#004098]"
             />
           </label>
           <Toggle
@@ -327,7 +327,7 @@ function Toggle({
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`w-12 h-7 rounded-full relative transition ${checked ? "bg-[#1e3a8a]" : "bg-slate-300"}`}
+        className={`w-12 h-7 rounded-full relative transition ${checked ? "bg-[#004098]" : "bg-slate-300"}`}
       >
         <span
           className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-all ${checked ? "left-[22px]" : "left-0.5"}`}
