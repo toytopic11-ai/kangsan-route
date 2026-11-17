@@ -48,17 +48,6 @@ function App() {
   const baseW = useMemo(() => Math.min(900, window.innerWidth - 24), []);
   const w = Math.round(baseW * zoom);
 
-  const exportPng = () => {
-    const c = document.createElement("canvas");
-    c.width = 1240; c.height = Math.round(1240 * PAGE_RATIO);
-    const ctx = c.getContext("2d")!;
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
-    ctx.fillStyle = "#111"; ctx.font = `${c.width / 45}px sans-serif`;
-    SAMPLE.forEach((line, i) => ctx.fillText(line, c.width * 0.08, c.width * (0.1 + i * 0.045)));
-    ink.current?.renderTo(ctx, c.width);
-    const a = document.createElement("a"); a.href = c.toDataURL("image/png"); a.download = "필기-미리보기.png"; a.click();
-  };
-
   return (
     <div className="h-full flex flex-col">
       <header className="flex items-center justify-between px-3 py-2 bg-[#1e3a8a] text-white">
@@ -67,7 +56,6 @@ function App() {
           <button className="px-2 py-1 rounded bg-white/15" onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}>－</button>
           <span className="px-1 py-1">{Math.round(zoom * 100)}%</span>
           <button className="px-2 py-1 rounded bg-white/15" onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}>＋</button>
-          <button className="px-2 py-1 rounded bg-white/15" onClick={exportPng}>저장</button>
         </div>
       </header>
       <PenToolbar settings={settings} onChange={patch} canUndo={hist.u} canRedo={hist.r}
