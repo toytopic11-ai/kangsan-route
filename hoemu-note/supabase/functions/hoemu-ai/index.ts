@@ -70,6 +70,23 @@ const pagesBlock = (pages: Page[]) =>
 
 class LimitError extends Error {}
 
+/** 공개 키: 예전 방식(SUPABASE_ANON_KEY) 또는 새 방식(SUPABASE_PUBLISHABLE_KEYS) 모두 지원 */
+function publicKey(): string {
+  const legacy = Deno.env.get("SUPABASE_ANON_KEY");
+  if (legacy) return legacy;
+  const raw = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
+  if (raw) {
+    try {
+      const v = JSON.parse(raw) as Record<string, string> | string[];
+      const first = Array.isArray(v) ? v[0] : (v["default"] ?? Object.values(v)[0]);
+      if (first) return first;
+    } catch {
+      return raw;
+    }
+  }
+  throw new Error("Supabase 공개 키를 찾을 수 없습니다");
+}
+
 async function callClaude(
   sb: SupabaseClient, userId: string, action: string, model: string,
   system: string, content: Anthropic.MessageParam["content"], maxTokens = 2000,
@@ -138,7 +155,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
     const auth = req.headers.get("Authorization") ?? "";
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    const sb = createClient(Deno.env.get("SUPABASE_URL")!, publicKey(), {
       global: { headers: { Authorization: auth } },
     });
     const { data: { user } } = await sb.auth.getUser();
