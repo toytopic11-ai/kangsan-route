@@ -88,8 +88,7 @@ export interface InkEngineOptions {
 }
 
 type HistoryEntry =
-  | { type: "add"; strokes: InkStroke[] }
-  | { type: "remove"; strokes: InkStroke[] };
+  { type: "add"; strokes: InkStroke[] } | { type: "remove"; strokes: InkStroke[] };
 
 const UNITS = 1000;
 const HOLD_MS = 550;
@@ -97,26 +96,38 @@ const HOLD_TOLERANCE = 2.5; // 단위
 const MIN_LINE_LENGTH = 12; // 단위
 
 let idSeq = 0;
-const newId = () => `${Date.now().toString(36)}${(idSeq++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const newId = () =>
+  `${Date.now().toString(36)}${(idSeq++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 /** perfect-freehand 외곽선 → Path2D (2차 곡선으로 매끈하게) */
 export function outlineToPath(outline: number[][]): Path2D {
   const path = new Path2D();
   const n = outline.length;
   if (n < 2) return path;
-  path.moveTo(outline[0][0], outline[0][1]);
+  const at = (i: number): [number, number] => {
+    const q = outline[i % n] ?? [0, 0];
+    return [q[0] ?? 0, q[1] ?? 0];
+  };
+  const [sx, sy] = at(0);
+  path.moveTo(sx, sy);
   for (let i = 0; i < n; i++) {
-    const [x0, y0] = outline[i];
-    const [x1, y1] = outline[(i + 1) % n];
+    const [x0, y0] = at(i);
+    const [x1, y1] = at(i + 1);
     path.quadraticCurveTo(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
   }
   path.closePath();
   return path;
 }
 
-export function strokeOutline(s: Pick<InkStroke, "kind" | "size" | "thinning" | "simulatePressure" | "straight" | "points">, streamline = 0.45, last = true) {
+export function strokeOutline(
+  s: Pick<InkStroke, "kind" | "size" | "thinning" | "simulatePressure" | "straight" | "points">,
+  streamline = 0.45,
+  last = true,
+) {
   const isHl = s.kind === "highlighter";
-  const pts = s.points.length === 1 ? [s.points[0], [s.points[0][0] + 0.01, s.points[0][1], s.points[0][2]]] : s.points;
+  const p0 = s.points[0];
+  const pts: InkPoint[] =
+    s.points.length === 1 && p0 ? [p0, [p0[0] + 0.01, p0[1], p0[2]]] : s.points;
   return getStroke(pts, {
     size: s.size,
     thinning: isHl || s.straight ? 0 : s.thinning,
@@ -145,13 +156,20 @@ function findScrollParent(el: HTMLElement | null): HTMLElement | null {
   let cur = el?.parentElement ?? null;
   while (cur) {
     const st = getComputedStyle(cur);
-    if (/(auto|scroll)/.test(st.overflowY + st.overflowX) && (cur.scrollHeight > cur.clientHeight || cur.scrollWidth > cur.clientWidth)) return cur;
+    if (
+      /(auto|scroll)/.test(st.overflowY + st.overflowX) &&
+      (cur.scrollHeight > cur.clientHeight || cur.scrollWidth > cur.clientWidth)
+    )
+      return cur;
     cur = cur.parentElement;
   }
   return (document.scrollingElement as HTMLElement) ?? null;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+const ZERO: InkPoint = [0, 0, 0.5];
+const firstPt = (pts: InkPoint[]): InkPoint => pts[0] ?? ZERO;
+const lastPt = (pts: InkPoint[]): InkPoint => pts[pts.length - 1] ?? ZERO;
 
 export class InkEngine {
   readonly root: HTMLDivElement;
@@ -202,11 +220,24 @@ export class InkEngine {
     this.root.className = "ink-root";
     // 레이어 전체를 '곱하기'로 합성 → 형광펜 아래 PDF 글자가 선명하게 비침
     // (각 캔버스가 아니라 루트에 적용해야 아래 PDF 와 합성됨)
-    Object.assign(this.root.style, { position: "absolute", inset: "0", zIndex: "5", mixBlendMode: "multiply" } as CSSStyleDeclaration);
+    Object.assign(this.root.style, {
+      position: "absolute",
+      inset: "0",
+      zIndex: "5",
+      mixBlendMode: "multiply",
+    } as CSSStyleDeclaration);
 
     const mk = (z: number, extra: Partial<CSSStyleDeclaration> = {}) => {
       const c = document.createElement("canvas");
-      Object.assign(c.style, { position: "absolute", inset: "0", width: "100%", height: "100%", pointerEvents: "none", zIndex: String(z), ...extra });
+      Object.assign(c.style, {
+        position: "absolute",
+        inset: "0",
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        zIndex: String(z),
+        ...extra,
+      });
       this.root.appendChild(c);
       return c;
     };
@@ -217,13 +248,24 @@ export class InkEngine {
 
     this.cursorEl = document.createElement("div");
     Object.assign(this.cursorEl.style, {
-      position: "absolute", left: "0", top: "0", zIndex: "4", pointerEvents: "none", borderRadius: "50%",
-      border: "1.5px solid rgba(30,58,138,.8)", background: "rgba(255,255,255,.25)", display: "none", transform: "translate(-50%,-50%)",
+      position: "absolute",
+      left: "0",
+      top: "0",
+      zIndex: "4",
+      pointerEvents: "none",
+      borderRadius: "50%",
+      border: "1.5px solid rgba(30,58,138,.8)",
+      background: "rgba(255,255,255,.25)",
+      display: "none",
+      transform: "translate(-50%,-50%)",
     } as CSSStyleDeclaration);
     this.root.appendChild(this.cursorEl);
 
     const ctx = (c: HTMLCanvasElement, lowLatency: boolean) =>
-      (c.getContext("2d", lowLatency ? ({ desynchronized: true } as CanvasRenderingContext2DSettings) : undefined) ?? c.getContext("2d"))!;
+      (c.getContext(
+        "2d",
+        lowLatency ? ({ desynchronized: true } as CanvasRenderingContext2DSettings) : undefined,
+      ) ?? c.getContext("2d"))!;
     this.hlCtx = ctx(this.hlCanvas, false);
     this.inkCtx = ctx(this.inkCanvas, false);
     this.liveCtx = ctx(this.liveCanvas, true);
@@ -241,7 +283,9 @@ export class InkEngine {
   }
 
   // ───────────────────────── 공개 API ─────────────────────────
-  getSettings(): InkSettings { return { ...this.settings }; }
+  getSettings(): InkSettings {
+    return { ...this.settings };
+  }
 
   setSettings(patch: Partial<InkSettings>) {
     this.settings = { ...this.settings, ...patch };
@@ -261,8 +305,12 @@ export class InkEngine {
     this.emitHistory();
   }
 
-  canUndo() { return this.undoStack.length > 0; }
-  canRedo() { return this.redoStack.length > 0; }
+  canUndo() {
+    return this.undoStack.length > 0;
+  }
+  canRedo() {
+    return this.redoStack.length > 0;
+  }
 
   undo() {
     const e = this.undoStack.pop();
@@ -338,7 +386,9 @@ export class InkEngine {
   }
 
   /** CSS px → 단위 변환 배율 */
-  private get scale() { return this.cssW / UNITS; }
+  private get scale() {
+    return this.cssW / UNITS;
+  }
 
   private setTransform(ctx: CanvasRenderingContext2D) {
     const k = this.scale * this.dpr;
@@ -365,7 +415,8 @@ export class InkEngine {
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       this.setTransform(ctx);
     }
-    for (const s of this.strokes) this.fillStroke(s.kind === "highlighter" ? this.hlCtx : this.inkCtx, s);
+    for (const s of this.strokes)
+      this.fillStroke(s.kind === "highlighter" ? this.hlCtx : this.inkCtx, s);
   }
 
   private drawOnBase(s: InkStroke) {
@@ -423,8 +474,8 @@ export class InkEngine {
 
   private resolveTool(e: PointerEvent): InkTool {
     // buttons 32 = S펜/스타일러스 지우개 끝, 2 = 측면(배럴) 버튼
-    if (e.pointerType === "pen" && (e.buttons & 32)) return "eraser";
-    if (e.pointerType === "pen" && this.settings.sideButtonEraser && (e.buttons & 2)) return "eraser";
+    if (e.pointerType === "pen" && e.buttons & 32) return "eraser";
+    if (e.pointerType === "pen" && this.settings.sideButtonEraser && e.buttons & 2) return "eraser";
     if (e.pointerType === "mouse" && e.button === 2) return "eraser";
     return this.settings.tool;
   }
@@ -442,7 +493,11 @@ export class InkEngine {
     this.activePointer = e.pointerId;
     this.activeTool = tool;
     this.rect = this.root.getBoundingClientRect();
-    try { this.root.setPointerCapture(e.pointerId); } catch { /* 일부 브라우저 무시 */ }
+    try {
+      this.root.setPointerCapture(e.pointerId);
+    } catch {
+      /* 일부 브라우저 무시 */
+    }
 
     const p = this.toUnits(e);
     if (tool === "eraser") {
@@ -461,7 +516,7 @@ export class InkEngine {
       size: isHl ? this.settings.highlighterSize : this.settings.penSize,
       thinning: this.settings.penThinning,
       simulatePressure: e.pointerType !== "pen",
-      straight: tool === "line" || undefined,
+      ...(tool === "line" ? { straight: true } : {}),
       points: [p],
       createdAt: Date.now(),
     };
@@ -480,7 +535,12 @@ export class InkEngine {
       // S펜 호버: 굵기 미리보기 원
       if ((e.pointerType === "pen" || e.pointerType === "mouse") && this.settings.tool !== "none") {
         const t = this.resolveTool(e);
-        const size = t === "eraser" ? this.settings.eraserSize : t === "highlighter" ? this.settings.highlighterSize : this.settings.penSize;
+        const size =
+          t === "eraser"
+            ? this.settings.eraserSize
+            : t === "highlighter"
+              ? this.settings.highlighterSize
+              : this.settings.penSize;
         this.showCursor(e, size);
       }
       return;
@@ -504,18 +564,18 @@ export class InkEngine {
 
     if (this.snapped) {
       const end = this.toUnits(e);
-      s.points = this.straightPoints(s.points[0], end);
+      s.points = this.straightPoints(firstPt(s.points), end);
       this.predicted = [];
     } else {
       for (const ev of list) {
         const p = this.toUnits(ev);
-        const prev = s.points[s.points.length - 1];
+        const prev = lastPt(s.points);
         if (Math.abs(prev[0] - p[0]) < 0.05 && Math.abs(prev[1] - p[1]) < 0.05) continue;
         s.points.push(p);
       }
       const pred = typeof e.getPredictedEvents === "function" ? e.getPredictedEvents() : [];
       this.predicted = pred.slice(0, 2).map((ev) => this.toUnits(ev));
-      const last = s.points[s.points.length - 1];
+      const last = lastPt(s.points);
       if (Math.hypot(last[0] - this.lastMove.x, last[1] - this.lastMove.y) > HOLD_TOLERANCE) {
         this.lastMove = { x: last[0], y: last[1], t: performance.now() };
         this.armHold();
@@ -531,7 +591,11 @@ export class InkEngine {
     }
     if (e.pointerId !== this.activePointer) return;
     clearTimeout(this.holdTimer);
-    try { this.root.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+    try {
+      this.root.releasePointerCapture(e.pointerId);
+    } catch {
+      /* noop */
+    }
     this.activePointer = null;
     this.rect = null;
 
@@ -555,8 +619,8 @@ export class InkEngine {
     if (!s) return;
     // 너무 짧은 직선(실수 탭)은 버림
     if (s.straight && s.points.length >= 2) {
-      const a = s.points[0];
-      const b = s.points[s.points.length - 1];
+      const a = firstPt(s.points);
+      const b = lastPt(s.points);
       if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 3) return;
     }
     this.strokes.push(s);
@@ -566,15 +630,19 @@ export class InkEngine {
   };
 
   private onLeave = (e: PointerEvent) => {
-    if (this.activePointer === null && e.pointerType !== "touch") this.cursorEl.style.display = "none";
+    if (this.activePointer === null && e.pointerType !== "touch")
+      this.cursorEl.style.display = "none";
   };
 
   private showCursor(e: PointerEvent, sizeUnits: number) {
     const r = this.root.getBoundingClientRect();
     const d = Math.max(4, sizeUnits * this.scale);
     Object.assign(this.cursorEl.style, {
-      display: "block", width: `${d}px`, height: `${d}px`,
-      left: `${e.clientX - r.left}px`, top: `${e.clientY - r.top}px`,
+      display: "block",
+      width: `${d}px`,
+      height: `${d}px`,
+      left: `${e.clientX - r.left}px`,
+      top: `${e.clientY - r.top}px`,
     });
   }
 
@@ -585,8 +653,8 @@ export class InkEngine {
     this.holdTimer = window.setTimeout(() => {
       const s = this.current;
       if (!s || this.snapped) return;
-      const a = s.points[0];
-      const b = s.points[s.points.length - 1];
+      const a = firstPt(s.points);
+      const b = lastPt(s.points);
       if (Math.hypot(a[0] - b[0], a[1] - b[1]) < MIN_LINE_LENGTH) return;
       this.snapped = true;
       s.straight = true;
@@ -620,9 +688,12 @@ export class InkEngine {
       const reach = r + s.size / 2;
       const pts = s.points;
       for (let i = 0; i < pts.length; i++) {
-        const a = pts[i];
-        const b = pts[Math.min(i + 1, pts.length - 1)];
-        if (distToSegment(x, y, a[0], a[1], b[0], b[1]) <= reach) { hit.push(s); break; }
+        const a = pts[i] ?? ZERO;
+        const b = pts[Math.min(i + 1, pts.length - 1)] ?? a;
+        if (distToSegment(x, y, a[0], a[1], b[0], b[1]) <= reach) {
+          hit.push(s);
+          break;
+        }
       }
     }
     if (!hit.length) return;
@@ -649,14 +720,22 @@ export class InkEngine {
     this.emitChange();
   }
 
-  private emitChange() { this.opts.onChange?.(this.getData()); }
-  private emitHistory() { this.opts.onHistoryChange?.(this.canUndo(), this.canRedo()); }
+  private emitChange() {
+    this.opts.onChange?.(this.getData());
+  }
+  private emitHistory() {
+    this.opts.onHistoryChange?.(this.canUndo(), this.canRedo());
+  }
 
   // ───────────── 손가락: 스크롤(관성) + 두 손가락 확대 ─────────────
   private onTouchDown(e: PointerEvent) {
     cancelAnimationFrame(this.inertiaId);
     this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    try { this.root.setPointerCapture(e.pointerId); } catch { /* noop */ }
+    try {
+      this.root.setPointerCapture(e.pointerId);
+    } catch {
+      /* noop */
+    }
     if (this.touches.size === 2) this.pinchDist = this.touchDistance();
     this.velocity = { x: 0, y: 0, t: performance.now() };
   }
@@ -669,10 +748,8 @@ export class InkEngine {
     if (this.touches.size >= 2) {
       const d = this.touchDistance();
       if (this.pinchDist > 0 && d > 0) {
-        const pts = [...this.touches.values()];
-        const cx = (pts[0].x + pts[1].x) / 2;
-        const cy = (pts[0].y + pts[1].y) / 2;
-        this.opts.onPinch?.(d / this.pinchDist, cx, cy);
+        const [t0, t1] = [...this.touches.values()];
+        if (t0 && t1) this.opts.onPinch?.(d / this.pinchDist, (t0.x + t1.x) / 2, (t0.y + t1.y) / 2);
       }
       this.pinchDist = d;
       return;
@@ -682,7 +759,11 @@ export class InkEngine {
     this.pan(dx, dy);
     const now = performance.now();
     const dt = Math.max(1, now - this.velocity.t);
-    this.velocity = { x: 0.8 * (dx / dt) + 0.2 * this.velocity.x, y: 0.8 * (dy / dt) + 0.2 * this.velocity.y, t: now };
+    this.velocity = {
+      x: 0.8 * (dx / dt) + 0.2 * this.velocity.x,
+      y: 0.8 * (dy / dt) + 0.2 * this.velocity.y,
+      t: now,
+    };
   }
 
   private onTouchUp(e: PointerEvent) {
@@ -692,8 +773,8 @@ export class InkEngine {
   }
 
   private touchDistance() {
-    const p = [...this.touches.values()];
-    return p.length < 2 ? 0 : Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+    const [t0, t1] = [...this.touches.values()];
+    return t0 && t1 ? Math.hypot(t0.x - t1.x, t0.y - t1.y) : 0;
   }
 
   private pan(dx: number, dy: number) {

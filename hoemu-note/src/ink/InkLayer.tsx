@@ -43,33 +43,47 @@ export const InkLayer = forwardRef<InkLayerHandle, Props>(function InkLayer(
   useEffect(() => {
     if (!hostRef.current) return;
     const engine = new InkEngine(hostRef.current, {
-      data: data ?? undefined,
+      ...(data ? { data } : {}),
       settings,
-      onChange: (d) => { lastEmitted.current = d; cb.current.onChange?.(d); },
+      onChange: (d) => {
+        lastEmitted.current = d;
+        cb.current.onChange?.(d);
+      },
       onHistoryChange: (u, r) => cb.current.onHistoryChange?.(u, r),
       onPinch: (r, x, y) => cb.current.onPinch?.(r, x, y),
-      onPan: cb.current.onPan ? (dx, dy) => cb.current.onPan?.(dx, dy) : undefined,
+      ...(cb.current.onPan
+        ? { onPan: (dx: number, dy: number) => cb.current.onPan?.(dx, dy) }
+        : {}),
     });
     engineRef.current = engine;
-    return () => { engine.destroy(); engineRef.current = null; };
+    return () => {
+      engine.destroy();
+      engineRef.current = null;
+    };
     // 엔진은 마운트 시 한 번만 생성
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { engineRef.current?.setSettings(settings); }, [settings]);
+  useEffect(() => {
+    engineRef.current?.setSettings(settings);
+  }, [settings]);
 
   useEffect(() => {
     // 외부(서버 로딩 등)에서 바뀐 데이터만 반영
     if (data && data !== lastEmitted.current) engineRef.current?.setData(data);
   }, [data]);
 
-  useImperativeHandle(ref, () => ({
-    undo: () => engineRef.current?.undo(),
-    redo: () => engineRef.current?.redo(),
-    clear: () => engineRef.current?.clear(),
-    getData: () => engineRef.current?.getData() ?? null,
-    renderTo: (ctx, w) => engineRef.current?.renderTo(ctx, w),
-  }), []);
+  useImperativeHandle(
+    ref,
+    () => ({
+      undo: () => engineRef.current?.undo(),
+      redo: () => engineRef.current?.redo(),
+      clear: () => engineRef.current?.clear(),
+      getData: () => engineRef.current?.getData() ?? null,
+      renderTo: (ctx, w) => engineRef.current?.renderTo(ctx, w),
+    }),
+    [],
+  );
 
   return <div ref={hostRef} className={className} style={{ position: "absolute", inset: 0 }} />;
 });

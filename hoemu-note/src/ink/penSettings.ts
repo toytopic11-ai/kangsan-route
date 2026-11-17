@@ -67,7 +67,11 @@ export function loadSettings(): InkSettings {
 }
 
 export function saveSettings(s: InkSettings) {
-  try { localStorage.setItem(KEY_SETTINGS, JSON.stringify(s)); } catch { /* 저장 불가 환경 무시 */ }
+  try {
+    localStorage.setItem(KEY_SETTINGS, JSON.stringify(s));
+  } catch {
+    /* 저장 불가 환경 무시 */
+  }
 }
 
 export function loadPresets(): PenPreset[] {
@@ -81,7 +85,11 @@ export function loadPresets(): PenPreset[] {
 }
 
 export function savePresets(list: PenPreset[]) {
-  try { localStorage.setItem(KEY_PRESETS, JSON.stringify(list)); } catch { /* noop */ }
+  try {
+    localStorage.setItem(KEY_PRESETS, JSON.stringify(list));
+  } catch {
+    /* noop */
+  }
 }
 
 /** 프리셋 → 엔진 설정 패치 */
@@ -93,7 +101,15 @@ export function presetToSettings(p: PenPreset): Partial<InkSettings> {
 
 /** 현재 설정 → 프리셋 */
 export function settingsToPreset(s: InkSettings, label: string): PenPreset | null {
-  if (s.tool === "highlighter") return { id: crypto.randomUUID(), label, tool: "highlighter", color: s.highlighterColor, size: s.highlighterSize };
-  if (s.tool === "pen" || s.tool === "line") return { id: crypto.randomUUID(), label, tool: s.tool, color: s.penColor, size: s.penSize };
+  if (s.tool === "highlighter")
+    return {
+      id: crypto.randomUUID(),
+      label,
+      tool: "highlighter",
+      color: s.highlighterColor,
+      size: s.highlighterSize,
+    };
+  if (s.tool === "pen" || s.tool === "line")
+    return { id: crypto.randomUUID(), label, tool: s.tool, color: s.penColor, size: s.penSize };
   return null;
 }
