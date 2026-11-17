@@ -141,6 +141,38 @@ export function strokeOutline(
   });
 }
 
+/**
+ * 저장된 필기 데이터를 아무 캔버스에나 그리기(PDF 내보내기·썸네일용, 화면 엔진 없이 동작).
+ * width = 대상 캔버스의 페이지 가로 픽셀. only 로 형광펜/펜 층만 따로 그릴 수 있음.
+ */
+export function renderInkData(
+  ctx: CanvasRenderingContext2D,
+  data: PageInkData | null | undefined,
+  width: number,
+  only?: StrokeKind,
+) {
+  if (!data?.strokes?.length) return;
+  const s = width / UNITS;
+  ctx.save();
+  ctx.scale(s, s);
+  const draw = (kind: StrokeKind) => {
+    for (const st of data.strokes) {
+      if (st.kind !== kind) continue;
+      ctx.fillStyle = st.color;
+      ctx.fill(outlineToPath(strokeOutline(st, DEFAULT_SETTINGS.streamline, true)));
+    }
+  };
+  if (!only || only === "highlighter") {
+    ctx.globalCompositeOperation = only ? "source-over" : "multiply";
+    draw("highlighter");
+  }
+  if (!only || only === "pen") {
+    ctx.globalCompositeOperation = "source-over";
+    draw("pen");
+  }
+  ctx.restore();
+}
+
 function distToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number) {
   const dx = bx - ax;
   const dy = by - ay;
