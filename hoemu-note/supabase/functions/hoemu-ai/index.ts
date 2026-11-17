@@ -204,9 +204,10 @@ const sources = (pages: Page[]) =>
   pages.map((p) => ({ document_id: p.document_id, title: p.title, page_no: p.page_no }));
 
 function mondayOf(d: Date) {
-  const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const day = (x.getUTCDay() + 6) % 7;
-  x.setUTCDate(x.getUTCDate() - day);
+  // 한국 시간 기준 그 주 월요일(월요일 새벽에도 이번 주로 계산)
+  const k = new Date(d.getTime() + 9 * 3600e3);
+  const x = new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()));
+  x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
   return x.toISOString().slice(0, 10);
 }
 
