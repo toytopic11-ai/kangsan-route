@@ -18,7 +18,10 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...cors, "Content-Type": "application/json" },
+  });
 
 const PRICE: Record<string, [number, number]> = {
   // [입력, 출력] 달러 / 100만 토큰
@@ -52,8 +55,25 @@ const TASKS: Record<string, string> = {
 };
 
 // 한국어 조사 떼기(검색 키워드 추출용, 외부 형태소 분석기 없이)
-const JOSA = /(으로서|으로써|에서는|에게서|이라는|까지는|부터는|으로|에서|에게|까지|부터|이나|라고|하고|와는|과는|이란|란|은|는|이|가|을|를|에|의|와|과|도|만|로|나)$/;
-const STOP = new Set(["무엇", "어떻게", "알려줘", "알려", "주세요", "해줘", "정리", "관련", "내용", "있는", "대한", "그리고", "어떤", "몇", "언제"]);
+const JOSA =
+  /(으로서|으로써|에서는|에게서|이라는|까지는|부터는|으로|에서|에게|까지|부터|이나|라고|하고|와는|과는|이란|란|은|는|이|가|을|를|에|의|와|과|도|만|로|나)$/;
+const STOP = new Set([
+  "무엇",
+  "어떻게",
+  "알려줘",
+  "알려",
+  "주세요",
+  "해줘",
+  "정리",
+  "관련",
+  "내용",
+  "있는",
+  "대한",
+  "그리고",
+  "어떤",
+  "몇",
+  "언제",
+]);
 function keywords(q: string): string[] {
   const out = new Set<string>();
   for (const raw of q.replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/)) {
@@ -66,7 +86,12 @@ function keywords(q: string): string[] {
 
 type Page = { document_id: string; title: string; page_no: number; content: string };
 const pagesBlock = (pages: Page[]) =>
-  pages.map((p) => `<자료 문서="${p.title}" 페이지="${p.page_no}">\n${p.content.slice(0, MAX_PAGE_CHARS)}\n</자료>`).join("\n\n");
+  pages
+    .map(
+      (p) =>
+        `<자료 문서="${p.title}" 페이지="${p.page_no}">\n${p.content.slice(0, MAX_PAGE_CHARS)}\n</자료>`,
+    )
+    .join("\n\n");
 
 class LimitError extends Error {}
 
@@ -88,8 +113,13 @@ function publicKey(): string {
 }
 
 async function callClaude(
-  sb: SupabaseClient, userId: string, action: string, model: string,
-  system: string, content: Anthropic.MessageParam["content"], maxTokens = 2000,
+  sb: SupabaseClient,
+  userId: string,
+  action: string,
+  model: string,
+  system: string,
+  content: Anthropic.MessageParam["content"],
+  maxTokens = 2000,
 ) {
   // 월 상한 확인
   const [{ data: spent }, { data: setting }] = await Promise.all([
@@ -97,7 +127,10 @@ async function callClaude(
     sb.from("app_settings").select("monthly_ai_limit_usd").maybeSingle(),
   ]);
   const limit = Number(setting?.monthly_ai_limit_usd ?? 3);
-  if (Number(spent ?? 0) >= limit) throw new LimitError(`이번 달 AI 사용 상한($${limit})에 도달했습니다. 설정에서 상한을 조정하세요.`);
+  if (Number(spent ?? 0) >= limit)
+    throw new LimitError(
+      `이번 달 AI 사용 상한($${limit})에 도달했습니다. 설정에서 상한을 조정하세요.`,
+    );
 
   const client = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
   const res = await client.messages.create({
@@ -111,13 +144,24 @@ async function callClaude(
   const [pi, po] = PRICE[model] ?? PRICE["claude-haiku-5-5"];
   const cost = (res.usage.input_tokens * pi + res.usage.output_tokens * po) / 1_000_000;
   await sb.from("ai_usage").insert({
-    user_id: userId, action, model,
-    input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens, cost_usd: cost,
+    user_id: userId,
+    action,
+    model,
+    input_tokens: res.usage.input_tokens,
+    output_tokens: res.usage.output_tokens,
+    cost_usd: cost,
   });
 
-  if (res.stop_reason === "refusal") return { text: "요청을 처리할 수 없습니다. 질문을 바꿔 다시 시도해 주세요.", cost };
-  const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n").trim();
-  return { text: res.stop_reason === "max_tokens" ? text + "\n\n(분량 제한으로 일부 생략됨)" : text, cost };
+  if (res.stop_reason === "refusal")
+    return { text: "요청을 처리할 수 없습니다. 질문을 바꿔 다시 시도해 주세요.", cost };
+  const text = res.content
+    .flatMap((b) => (b.type === "text" ? [b.text] : []))
+    .join("\n")
+    .trim();
+  return {
+    text: res.stop_reason === "max_tokens" ? text + "\n\n(분량 제한으로 일부 생략됨)" : text,
+    cost,
+  };
 }
 
 /** 응답 안의 JSON 배열/객체만 안전하게 추출 */
@@ -126,23 +170,38 @@ function parseJson<T>(text: string, fallback: T): T {
   const body = (m ? m[1] : text).trim();
   const start = body.search(/[[{]/);
   if (start < 0) return fallback;
-  try { return JSON.parse(body.slice(start)); } catch {
+  try {
+    return JSON.parse(body.slice(start));
+  } catch {
     const end = Math.max(body.lastIndexOf("]"), body.lastIndexOf("}"));
-    try { return JSON.parse(body.slice(start, end + 1)); } catch { return fallback; }
+    try {
+      return JSON.parse(body.slice(start, end + 1));
+    } catch {
+      return fallback;
+    }
   }
 }
 
-async function findPages(sb: SupabaseClient, q: string, org?: string | null, categoryIds?: string[] | null): Promise<Page[]> {
+async function findPages(
+  sb: SupabaseClient,
+  q: string,
+  org?: string | null,
+  categoryIds?: string[] | null,
+): Promise<Page[]> {
   const kws = keywords(q);
   if (!kws.length) return [];
   const { data, error } = await sb.rpc("match_pages", {
-    keywords: kws, p_org: org ?? null, p_category_ids: categoryIds?.length ? categoryIds : null, p_limit: MAX_PAGES,
+    keywords: kws,
+    p_org: org ?? null,
+    p_category_ids: categoryIds?.length ? categoryIds : null,
+    p_limit: MAX_PAGES,
   });
   if (error) throw error;
   return (data ?? []) as Page[];
 }
 
-const sources = (pages: Page[]) => pages.map((p) => ({ document_id: p.document_id, title: p.title, page_no: p.page_no }));
+const sources = (pages: Page[]) =>
+  pages.map((p) => ({ document_id: p.document_id, title: p.title, page_no: p.page_no }));
 
 function mondayOf(d: Date) {
   const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -158,7 +217,9 @@ Deno.serve(async (req) => {
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, publicKey(), {
       global: { headers: { Authorization: auth } },
     });
-    const { data: { user } } = await sb.auth.getUser();
+    const {
+      data: { user },
+    } = await sb.auth.getUser();
     if (!user) return json({ error: "로그인이 필요합니다" }, 401);
 
     const body = await req.json().catch(() => ({}));
@@ -171,9 +232,20 @@ Deno.serve(async (req) => {
         const q = String(body.question ?? "").slice(0, 2000);
         if (!q) return json({ error: "질문이 비어 있습니다" }, 400);
         const pages = await findPages(sb, q, body.org, body.category_ids);
-        if (!pages.length) return json({ answer: "관련 자료를 찾지 못했습니다. 검색 범위나 단어를 바꿔 보세요.", sources: [] });
+        if (!pages.length)
+          return json({
+            answer: "관련 자료를 찾지 못했습니다. 검색 범위나 단어를 바꿔 보세요.",
+            sources: [],
+          });
         const fmt = body.output_format ? `\n출력 형식: ${body.output_format}` : "";
-        const r = await callClaude(sb, user.id, "ask", model, BASE_RULES + fmt, `[자료]\n${pagesBlock(pages)}\n\n[질문]\n${q}`);
+        const r = await callClaude(
+          sb,
+          user.id,
+          "ask",
+          model,
+          BASE_RULES + fmt,
+          `[자료]\n${pagesBlock(pages)}\n\n[질문]\n${q}`,
+        );
         return json({ answer: r.text, sources: sources(pages), cost_usd: r.cost });
       }
 
@@ -183,39 +255,73 @@ Deno.serve(async (req) => {
         if (!TASKS[task]) return json({ error: `알 수 없는 작업: ${task}` }, 400);
         const materials = String(body.materials ?? "").slice(0, 30000);
         const options = body.options ? `\n[옵션]\n${JSON.stringify(body.options)}` : "";
-        const r = await callClaude(sb, user.id, task, model, `${BASE_RULES}\n\n작업: ${TASKS[task]}`, `[자료]\n${materials}${options}`, 4000);
+        const r = await callClaude(
+          sb,
+          user.id,
+          task,
+          model,
+          `${BASE_RULES}\n\n작업: ${TASKS[task]}`,
+          `[자료]\n${materials}${options}`,
+          4000,
+        );
         return json({ text: r.text, cost_usd: r.cost });
       }
 
       // ③ 글자 인식(스캔본·사진) — 이미지 1장씩
       case "ocr": {
         const media = String(body.media_type ?? "image/jpeg");
-        if (!/^image\/(jpeg|png|webp)$/.test(media)) return json({ error: "jpeg/png/webp 이미지만 가능합니다" }, 400);
-        const r = await callClaude(sb, user.id, "ocr", "claude-haiku-5-5",
+        if (!/^image\/(jpeg|png|webp)$/.test(media))
+          return json({ error: "jpeg/png/webp 이미지만 가능합니다" }, 400);
+        const r = await callClaude(
+          sb,
+          user.id,
+          "ocr",
+          "claude-haiku-5-5",
           "이미지 속 한국어 문서의 텍스트를 원문 그대로 추출한다. 표는 마크다운 표로. 설명·요약을 덧붙이지 않는다.",
           [
-            { type: "image", source: { type: "base64", media_type: media as "image/jpeg", data: String(body.image_base64 ?? "") } },
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: media as "image/jpeg",
+                data: String(body.image_base64 ?? ""),
+              },
+            },
             { type: "text", text: "텍스트만 추출" },
-          ], 4000);
+          ],
+          4000,
+        );
         return json({ text: r.text, cost_usd: r.cost });
       }
 
       // ④ 예산표 추출 → JSON
       case "extract_budget": {
-        const r = await callClaude(sb, user.id, "extract_budget", "claude-haiku-5-5",
+        const r = await callClaude(
+          sb,
+          user.id,
+          "extract_budget",
+          "claude-haiku-5-5",
           `예산서 텍스트에서 항목을 추출해 JSON 배열만 출력한다. 형식:
 [{"section":"수입|지출","category_l1":"관","category_l2":"항","item_name":"목","amount":원단위정수}]
 천원 단위 표는 1000을 곱해 원 단위로. 합계·소계 행은 제외.`,
-          String(body.text ?? "").slice(0, 30000), 8000);
+          String(body.text ?? "").slice(0, 30000),
+          8000,
+        );
         return json({ items: parseJson(r.text, [] as unknown[]), cost_usd: r.cost });
       }
 
       // ⑤ 규정 조문 분해 → JSON
       case "split_articles": {
-        const r = await callClaude(sb, user.id, "split_articles", "claude-haiku-5-5",
+        const r = await callClaude(
+          sb,
+          user.id,
+          "split_articles",
+          "claude-haiku-5-5",
           `규정 텍스트를 조문 단위로 나눠 JSON 배열만 출력한다. 형식:
 [{"article_no":"제1조","title":"목적","content":"조문 전문"}] 부칙은 article_no를 "부칙"으로.`,
-          String(body.text ?? "").slice(0, 40000), 16000);
+          String(body.text ?? "").slice(0, 40000),
+          16000,
+        );
         return json({ articles: parseJson(r.text, [] as unknown[]), cost_usd: r.cost });
       }
 
@@ -224,23 +330,43 @@ Deno.serve(async (req) => {
         const role = body.role === "답변자" ? "답변자" : "질의자";
         let topic = String(body.focus ?? "");
         if (body.meeting_id) {
-          const { data: ag } = await sb.from("meeting_agendas").select("title").eq("meeting_id", body.meeting_id).order("sort_order");
+          const { data: ag } = await sb
+            .from("meeting_agendas")
+            .select("title")
+            .eq("meeting_id", body.meeting_id)
+            .order("sort_order");
           topic += " " + (ag ?? []).map((a: { title: string }) => a.title).join(" ");
         }
         const pages = await findPages(sb, topic, body.org);
         if (!pages.length) return json({ error: "리허설에 쓸 관련 자료를 찾지 못했습니다." }, 404);
-        const persona = role === "답변자"
-          ? "경북도회 운영위원 입장에서, 대의원들이 회의에서 던질 날카로운 예상 질문과 근거 기반 모범 답변을 만든다."
-          : "대의원 입장에서, 집행부에 할 효과적인 질의와 예상되는 집행부 답변, 그에 대한 재질의 포인트를 만든다.";
-        const r = await callClaude(sb, user.id, "rehearsal", model,
+        const persona =
+          role === "답변자"
+            ? "경북도회 운영위원 입장에서, 대의원들이 회의에서 던질 날카로운 예상 질문과 근거 기반 모범 답변을 만든다."
+            : "대의원 입장에서, 집행부에 할 효과적인 질의와 예상되는 집행부 답변, 그에 대한 재질의 포인트를 만든다.";
+        const r = await callClaude(
+          sb,
+          user.id,
+          "rehearsal",
+          model,
           `${BASE_RULES}\n\n${persona}\nJSON 배열만 출력: [{"question":"...","answer":"... [문서명 p.N]"}] 8개.`,
-          `[자료]\n${pagesBlock(pages)}\n\n[주제]\n${topic}`, 4000);
-        const items = parseJson(r.text, [] as { question: string; answer: string }[]).filter((x) => x?.question);
+          `[자료]\n${pagesBlock(pages)}\n\n[주제]\n${topic}`,
+          4000,
+        );
+        const items = parseJson(r.text, [] as { question: string; answer: string }[]).filter(
+          (x) => x?.question,
+        );
         if (items.length) {
-          await sb.from("rehearsals").insert(items.map((x, i) => ({
-            user_id: user.id, meeting_id: body.meeting_id ?? null, role, question: x.question, answer: x.answer ?? "",
-            sources: sources(pages), sort_order: i + 1,
-          })));
+          await sb.from("rehearsals").insert(
+            items.map((x, i) => ({
+              user_id: user.id,
+              meeting_id: body.meeting_id ?? null,
+              role,
+              question: x.question,
+              answer: x.answer ?? "",
+              sources: sources(pages),
+              sort_order: i + 1,
+            })),
+          );
         }
         return json({ items, sources: sources(pages), cost_usd: r.cost });
       }
@@ -249,7 +375,11 @@ Deno.serve(async (req) => {
       case "weekly_report": {
         const week = mondayOf(new Date());
         if (!body.force) {
-          const { data: ex } = await sb.from("weekly_reports").select("content").eq("week_start", week).maybeSingle();
+          const { data: ex } = await sb
+            .from("weekly_reports")
+            .select("content")
+            .eq("week_start", week)
+            .maybeSingle();
           if (ex) return json({ week_start: week, content: ex.content, cached: true });
         }
         const now = new Date();
@@ -258,54 +388,163 @@ Deno.serve(async (req) => {
         const today = now.toISOString().slice(0, 10);
         const [act, meet, resol, sug, law] = await Promise.all([
           sb.from("activities").select("activity_date,type,title,org").gte("created_at", ago),
-          sb.from("meetings").select("meeting_date,title,org,place").gte("meeting_date", now.toISOString()).lte("meeting_date", ahead).order("meeting_date"),
-          sb.from("resolutions").select("title,org,status,due_date").in("status", ["예정", "진행", "미이행"]).lte("due_date", today),
-          sb.from("suggestions").select("content,status,org").in("status", ["접수", "검토", "처리완료"]),
+          sb
+            .from("meetings")
+            .select("meeting_date,title,org,place")
+            .gte("meeting_date", now.toISOString())
+            .lte("meeting_date", ahead)
+            .order("meeting_date"),
+          sb
+            .from("resolutions")
+            .select("title,org,status,due_date")
+            .in("status", ["예정", "진행", "미이행"])
+            .lte("due_date", today),
+          sb
+            .from("suggestions")
+            .select("content,status,org")
+            .in("status", ["접수", "검토", "처리완료"]),
           sb.from("law_changes").select("law_name,effective_date,summary").eq("is_read", false),
         ]);
         const facts = JSON.stringify({
-          지난7일_활동: act.data, 다가오는_회의_2주: meet.data, 기한지난_의결사항: resol.data,
-          미처리_건의_회신필요: sug.data, 미확인_법령개정: law.data,
+          지난7일_활동: act.data,
+          다가오는_회의_2주: meet.data,
+          기한지난_의결사항: resol.data,
+          미처리_건의_회신필요: sug.data,
+          미확인_법령개정: law.data,
         });
-        const r = await callClaude(sb, user.id, "weekly_report", "claude-haiku-5-5",
+        const r = await callClaude(
+          sb,
+          user.id,
+          "weekly_report",
+          "claude-haiku-5-5",
           `대의원 주간 회무 리포트를 작성한다. 섹션: 📌이번 주 할 일(우선순위 3개) / 🗓다가오는 회의(D-day) / ⚠️기한 지난 의결사항 / 💬회신 필요 건의 / ⚖️법령 개정 / ✅지난주 활동 요약.
 항목이 없으면 '없음'. 데이터에 없는 내용은 만들지 않는다. 개조식, A4 반 장 이내.`,
-          `[데이터]\n${facts}`, 2000);
-        await sb.from("weekly_reports").upsert({ user_id: user.id, week_start: week, content: r.text }, { onConflict: "user_id,week_start" });
+          `[데이터]\n${facts}`,
+          2000,
+        );
+        await sb
+          .from("weekly_reports")
+          .upsert(
+            { user_id: user.id, week_start: week, content: r.text },
+            { onConflict: "user_id,week_start" },
+          );
         await sb.from("app_settings").update({ last_weekly_report: week }).eq("user_id", user.id);
         return json({ week_start: week, content: r.text, cost_usd: r.cost });
       }
 
       // ⑧ 법령 개정 확인 — 하루 1회만(앱 실행 시 호출해도 중복 조회 안 함)
-      case "check_laws": {
-        const oc = Deno.env.get("LAW_API_OC");
-        if (!oc) return json({ error: "LAW_API_OC 비밀값이 없습니다(국가법령정보센터 Open API 신청 후 등록)." }, 400);
-        const { data: st } = await sb.from("app_settings").select("last_law_check").maybeSingle();
-        if (!body.force && st?.last_law_check && Date.now() - new Date(st.last_law_check).getTime() < 20 * 3600e3) {
-          return json({ skipped: true, reason: "오늘 이미 확인함" });
-        }
-        const { data: watch } = await sb.from("law_watch").select("*").order("sort_order");
-        const changes: { law_name: string; promulgation_date: string; effective_date: string }[] = [];
-        for (const w of watch ?? []) {
-          const url = `https://www.law.go.kr/DRF/lawSearch.do?OC=${encodeURIComponent(oc)}&target=law&type=JSON&display=20&query=${encodeURIComponent(w.law_name)}`;
+      // ⑨ 국회 발의 법안(열린국회정보) — 키워드가 든 법안을 새로 찾으면 law_changes 에 '[국회 발의]'로 기록
+      case "check_bills": {
+        const key = Deno.env.get("ASSEMBLY_API_KEY");
+        if (!key)
+          return json(
+            { error: "ASSEMBLY_API_KEY 비밀값이 없습니다(열린국회정보 인증키 신청 후 등록)." },
+            400,
+          );
+        const words = ["공인중개사", "중개보수", "임대차", "전세사기", "부동산 거래신고"];
+        const { data: prev } = await sb
+          .from("law_changes")
+          .select("law_name, promulgation_date")
+          .like("summary", "[국회 발의]%");
+        const seen = new Set(
+          (prev ?? []).map(
+            (p: { law_name: string; promulgation_date: string | null }) =>
+              `${p.law_name}|${p.promulgation_date}`,
+          ),
+        );
+        const found: {
+          law_name: string;
+          promulgation_date: string | null;
+          effective_date: null;
+          summary: string;
+        }[] = [];
+        for (const w of words) {
+          const url = `https://open.assembly.go.kr/portal/openapi/nzmimeepazxkubdpn?KEY=${encodeURIComponent(key)}&Type=json&pIndex=1&pSize=30&AGE=22&BILL_NAME=${encodeURIComponent(w)}`;
           const res = await fetch(url);
           if (!res.ok) continue;
           const j = await res.json().catch(() => null);
-          const raw = j?.LawSearch?.law;
+          const blocks = (j?.nzmimeepazxkubdpn ?? []) as { row?: Record<string, string>[] }[];
+          const rows = blocks.flatMap((b) => b.row ?? []);
+          for (const r of rows) {
+            const name = r["BILL_NAME"] ?? "";
+            const date = r["PROPOSE_DT"] ?? null;
+            const k = `${name}|${date}`;
+            if (!name || seen.has(k)) continue;
+            seen.add(k);
+            found.push({
+              law_name: name,
+              promulgation_date: date,
+              effective_date: null,
+              summary: `[국회 발의] ${r["PROPOSER"] ?? ""} · ${r["COMMITTEE"] ?? "소관위 미정"} · 처리: ${r["PROC_RESULT"] ?? "계류"}${r["DETAIL_LINK"] ? `\n${r["DETAIL_LINK"]}` : ""}`,
+            });
+          }
+        }
+        // 처음 실행 때는 최근 것만(최근 90일) 알림으로 남김
+        const since = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
+        const fresh = (prev ?? []).length
+          ? found
+          : found.filter((f) => (f.promulgation_date ?? "") >= since);
+        if (fresh.length)
+          await sb.from("law_changes").insert(fresh.map((f) => ({ ...f, user_id: user.id })));
+        return json({ checked: words.length, new_bills: fresh.length });
+      }
+
+      case "check_laws": {
+        const oc = Deno.env.get("LAW_API_OC");
+        if (!oc)
+          return json(
+            { error: "LAW_API_OC 비밀값이 없습니다(국가법령정보센터 Open API 신청 후 등록)." },
+            400,
+          );
+        const { data: st } = await sb.from("app_settings").select("last_law_check").maybeSingle();
+        if (
+          !body.force &&
+          st?.last_law_check &&
+          Date.now() - new Date(st.last_law_check).getTime() < 20 * 3600e3
+        ) {
+          return json({ skipped: true, reason: "오늘 이미 확인함" });
+        }
+        const { data: watch } = await sb.from("law_watch").select("*").order("sort_order");
+        const changes: { law_name: string; promulgation_date: string; effective_date: string }[] =
+          [];
+        for (const w of watch ?? []) {
+          // 조례·자치규칙은 자치법규(ordin), 그 밖은 법령(law)
+          const target = /조례|자치/.test(w.law_name) ? "ordin" : "law";
+          const url = `https://www.law.go.kr/DRF/lawSearch.do?OC=${encodeURIComponent(oc)}&target=${target}&type=JSON&display=20&query=${encodeURIComponent(w.law_name)}`;
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const j = await res.json().catch(() => null);
+          const raw =
+            target === "ordin" ? (j?.OrdinSearch?.law ?? j?.OrdinSearch?.ordin) : j?.LawSearch?.law;
           const list = (Array.isArray(raw) ? raw : raw ? [raw] : []) as Record<string, string>[];
-          const hit = list.find((x) => (x["법령명한글"] ?? "").replace(/\s/g, "") === w.law_name.replace(/\s/g, ""));
+          const nameOf = (x: Record<string, string>) =>
+            (x["법령명한글"] ?? x["자치법규명"] ?? "").replace(/\s/g, "");
+          const hit = list.find((x) => nameOf(x) === w.law_name.replace(/\s/g, ""));
           if (!hit) continue;
           const prom = hit["공포일자"] ?? "";
           const eff = hit["시행일자"] ?? "";
-          const isNew = !!w.last_promulgation_date && (prom !== w.last_promulgation_date || eff !== w.last_effective_date);
-          await sb.from("law_watch").update({ last_promulgation_date: prom, last_effective_date: eff, checked_at: new Date().toISOString() }).eq("id", w.id);
-          if (isNew) changes.push({ law_name: w.law_name, promulgation_date: prom, effective_date: eff });
+          const isNew =
+            !!w.last_promulgation_date &&
+            (prom !== w.last_promulgation_date || eff !== w.last_effective_date);
+          await sb
+            .from("law_watch")
+            .update({
+              last_promulgation_date: prom,
+              last_effective_date: eff,
+              checked_at: new Date().toISOString(),
+            })
+            .eq("id", w.id);
+          if (isNew)
+            changes.push({ law_name: w.law_name, promulgation_date: prom, effective_date: eff });
         }
         if (changes.length) {
           await sb.from("law_changes").insert(changes.map((c) => ({ ...c, user_id: user.id })));
           await sb.from("regulations").update({ needs_review: true }).eq("user_id", user.id);
         }
-        await sb.from("app_settings").update({ last_law_check: new Date().toISOString() }).eq("user_id", user.id);
+        await sb
+          .from("app_settings")
+          .update({ last_law_check: new Date().toISOString() })
+          .eq("user_id", user.id);
         return json({ checked: watch?.length ?? 0, changes });
       }
 
@@ -314,8 +553,10 @@ Deno.serve(async (req) => {
     }
   } catch (e) {
     if (e instanceof LimitError) return json({ error: e.message }, 429);
-    if (e instanceof Anthropic.RateLimitError) return json({ error: "AI 요청이 많습니다. 잠시 후 다시 시도하세요." }, 429);
-    if (e instanceof Anthropic.AuthenticationError) return json({ error: "ANTHROPIC_API_KEY 설정을 확인하세요." }, 500);
+    if (e instanceof Anthropic.RateLimitError)
+      return json({ error: "AI 요청이 많습니다. 잠시 후 다시 시도하세요." }, 429);
+    if (e instanceof Anthropic.AuthenticationError)
+      return json({ error: "ANTHROPIC_API_KEY 설정을 확인하세요." }, 500);
     if (e instanceof Anthropic.APIError) return json({ error: `AI 오류(${e.status})` }, 502);
     console.error(e);
     return json({ error: (e as Error)?.message ?? "서버 오류" }, 500);
