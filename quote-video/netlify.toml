@@ -1,0 +1,17 @@
+# 한줄 글영상 스튜디오 - Netlify 설정
+# Netlify에서 Base directory를 quote-video 로 지정하면 이 파일이 적용됩니다.
+[build]
+  publish = "."
+  command = ""
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
