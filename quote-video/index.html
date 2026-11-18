@@ -1,0 +1,867 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>[hidden]{display:none!important}img{max-width:100%}</style></head><body>
+<title>한줄 글영상 스튜디오</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&family=Nanum+Pen+Script&family=Hi+Melody&family=Gaegu&family=Gamja+Flower&family=East+Sea+Dokdo&family=Dokdo&family=Yeon+Sung&family=Song+Myung&family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&display=swap">
+<style>
+/* Layout: 작업대(조정판) + 고정 미리보기 화면. 어두운 편집실 한 가지 톤으로 고정. */
+:root{
+  --bg:#141312; --panel:#1c1b19; --panel2:#232220; --line:#34312c;
+  --fg:#efe9df; --muted:#a39b8e; --accent:#e8b65c; --accent-ink:#1d1607;
+  --ok:#8fc79a; --warn:#e58f74;
+  --ui:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --display:"Nanum Brush Script","Gowun Batang",serif;
+  --serif:"Gowun Batang","Nanum Myeongjo",serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--ui);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 20px}
+header h1{font-family:var(--display);font-weight:400;font-size:clamp(40px,6vw,58px);line-height:1;margin:0;letter-spacing:.5px}
+header h1 b{color:var(--accent);font-weight:400}
+header p{margin:0;color:var(--muted);max-width:46ch;font-size:14px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}
+@media(min-width:960px){.grid{grid-template-columns:minmax(0,1fr) minmax(0,440px)}.stage{position:sticky;top:max(16px,env(safe-area-inset-top,0px))}}
+.stage{display:flex;flex-direction:column;gap:12px;align-items:center;min-width:0}
+.screen{background:#000;border:1px solid var(--line);border-radius:18px;padding:10px;display:flex;justify-content:center;max-width:100%}
+#cv{display:block;max-width:100%;max-height:68vh;width:auto;height:auto;border-radius:10px;background:#222}
+.transport{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;width:100%;max-width:560px}
+.transport input[type=range]{flex:1 1 160px;min-width:0}
+.time{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;min-width:74px;text-align:right}
+.cta{display:flex;flex-wrap:wrap;gap:10px;width:100%;max-width:560px}
+.btn{font:inherit;border:1px solid var(--line);background:var(--panel2);color:var(--fg);border-radius:12px;padding:10px 14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px}
+.btn:hover{border-color:#5a5449}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.chip:focus-visible,.scene:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700;flex:1 1 220px;font-size:16px}
+.btn.primary:disabled{opacity:.55;cursor:progress}
+.btn.small{min-height:34px;padding:6px 10px;font-size:13px;border-radius:10px}
+.status{font-size:13px;color:var(--muted);min-height:1.4em;text-align:center;max-width:560px}
+.status.ok{color:var(--ok)}.status.err{color:var(--warn)}
+.bar{width:100%;max-width:560px;height:6px;border-radius:6px;background:var(--panel2);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+#result{width:100%;max-width:560px;display:flex;flex-direction:column;gap:8px;align-items:center}
+#result video{max-width:100%;max-height:50vh;border-radius:10px;border:1px solid var(--line)}
+.controls{display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel h2{margin:0;font-size:15px;font-weight:700;display:flex;align-items:baseline;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.panel h2 small{font-weight:400;color:var(--muted);font-size:12px}
+.step{color:var(--accent);font-family:var(--serif);margin-right:6px}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted);min-width:0}
+input[type=text],input[type=password],textarea,select{font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%;min-width:0}
+textarea{resize:vertical;line-height:1.6}
+#text{font-family:var(--serif);font-size:16px;min-height:120px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.hint{font-size:12px;color:var(--muted);margin:0}
+.scenes{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.scene{border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:5px;cursor:pointer;color:var(--fg);font:inherit;text-align:left;display:flex;flex-direction:column;gap:4px}
+.scene canvas{width:100%;aspect-ratio:9/16;border-radius:8px;display:block;max-width:100%}
+.scene span{font-size:12px;line-height:1.3;padding:0 2px 2px}
+.scene[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.fonts{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.chip{border:1px solid var(--line);background:var(--panel2);color:var(--fg);border-radius:12px;padding:8px 6px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.chip .s{font-size:27px;line-height:1.15;white-space:nowrap}
+.chip .n{font-family:var(--ui);font-size:11px;color:var(--muted)}
+.chip[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);border-radius:999px;padding:6px 12px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.slider{display:grid;grid-template-columns:88px minmax(0,1fr) 44px;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.slider output{font-variant-numeric:tabular-nums;text-align:right}
+input[type=range]{accent-color:var(--accent);width:100%}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.prompt{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:110px}
+details summary{cursor:pointer;color:var(--muted);font-size:13px}
+.check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg)}
+.check input{accent-color:var(--accent);width:18px;height:18px}
+a{color:var(--accent)}
+.note{font-size:12px;color:var(--muted);border-left:2px solid var(--line);padding-left:10px;margin:0}
+footer{color:var(--muted);font-size:12px;text-align:center}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>한줄 <b>글영상</b> 스튜디오</h1>
+    <p>좋은 글을 넣으면 감성 사진 배경 위에 손글씨가 한 줄씩 써지는 10초 영상을 만듭니다. 잔잔한 배경음악이 자동으로 들어갑니다.</p>
+  </header>
+
+  <div class="grid">
+    <section class="stage" aria-label="미리보기">
+      <div class="screen"><canvas id="cv" width="540" height="960" aria-label="영상 미리보기"></canvas></div>
+      <div class="transport">
+        <button class="btn small" id="playBtn" type="button">▶ 미리보기 재생</button>
+        <input type="range" id="scrub" min="0" max="10" step="0.01" value="7.5" aria-label="재생 위치">
+        <span class="time" id="timeLbl">7.5 / 10초</span>
+      </div>
+      <div class="cta">
+        <button class="btn primary" id="makeBtn" type="button">영상 만들기 (MP4 저장)</button>
+      </div>
+      <div class="bar" aria-hidden="true"><i id="barFill"></i></div>
+      <p class="status" id="status">미리보기 재생을 누르면 음악과 함께 움직임을 확인할 수 있어요.</p>
+      <div id="result" hidden></div>
+    </section>
+
+    <section class="controls" aria-label="설정">
+      <div class="panel">
+        <h2><span><span class="step">1</span>글 넣기</span><small>Enter로 줄을 나누면 그 줄 단위로 나타나요</small></h2>
+        <label class="f">추천 글 불러오기
+          <select id="sample"></select>
+        </label>
+        <label class="f">본문
+          <textarea id="text" rows="5"></textarea>
+        </label>
+        <div class="row">
+          <label class="f">저자 <input type="text" id="author" placeholder="예) 안중근"></label>
+          <label class="f">출처·직함 <input type="text" id="source" placeholder="예) <한 번은 독해져라>, 작가"></label>
+        </div>
+        <label class="f">상단 브랜드 표시 (비우면 숨김) <input type="text" id="brand" placeholder="예) 강산부동산"></label>
+        <div class="tabs">
+          <button class="btn small" id="autoBreak" type="button">자동 줄나눔</button>
+          <button class="btn small" id="suggest" type="button">글에 어울리는 장면 추천</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2><span><span class="step">2</span>장면 스타일</span><small>12가지 · 인물은 모두 한국인으로 생성</small></h2>
+        <div class="scenes" id="scenes"></div>
+        <p class="hint" id="sceneDesc"></p>
+      </div>
+
+      <div class="panel">
+        <h2><span><span class="step">3</span>배경 사진·영상</span><small>사진 퀄리티를 결정하는 단계</small></h2>
+        <div class="seg" id="bgTabs" role="group" aria-label="배경 방식">
+          <button type="button" data-v="ai" aria-pressed="true">AI로 생성</button>
+          <button type="button" data-v="upload" aria-pressed="false">내 사진·영상</button>
+          <button type="button" data-v="scene" aria-pressed="false">기본 그림 배경</button>
+        </div>
+
+        <div id="tab-ai" class="panel" style="padding:12px;background:var(--panel2)">
+          <label class="f">Gemini API 키
+            <input type="password" id="apiKey" autocomplete="off" placeholder="AIza...">
+          </label>
+          <label class="check"><input type="checkbox" id="rememberKey"> 이 기기에 키 기억하기</label>
+          <div class="tabs">
+            <button class="btn small" id="genImg" type="button">AI 사진 생성 (약 10초)</button>
+            <button class="btn small" id="genVid" type="button">사진→움직이는 영상 (Veo, 1~3분)</button>
+          </div>
+          <p class="status" id="aiStatus" style="text-align:left"></p>
+          <details>
+            <summary>고급: 모델 이름</summary>
+            <div class="row" style="margin-top:8px">
+              <label class="f">사진 모델 <input type="text" id="imgModel" value="imagen-4.0-generate-001"></label>
+              <label class="f">영상 모델 <input type="text" id="vidModel" value="veo-3.0-fast-generate-001"></label>
+            </div>
+            <p class="hint" style="margin-top:6px">Google이 모델 이름을 바꾸면 여기서 고쳐 넣으세요. 키 발급: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a></p>
+          </details>
+          <p class="note">API 키가 없으면 아래 프롬프트를 복사해 Gemini 앱·Mirra·Kling 등에 붙여 넣어 만든 뒤 <b>내 사진·영상</b>으로 올려 주세요.</p>
+        </div>
+
+        <div id="tab-upload" hidden>
+          <label class="f">사진 또는 영상 파일 (jpg·png·mp4·mov)
+            <input type="file" id="bgFile" accept="image/*,video/*">
+          </label>
+          <p class="hint">AI 앱에서 만든 사진·영상, 직접 찍은 포항 풍경 모두 좋아요. 영상이 10초보다 짧으면 자동으로 느리게 재생해 길이를 맞춥니다.</p>
+        </div>
+
+        <div id="tab-scene" hidden>
+          <p class="hint">선택한 장면을 그림으로 그린 배경입니다(인물 없음). AI 사진이 준비되기 전 연습용으로 쓰세요.</p>
+        </div>
+
+        <label class="f">사진 프롬프트 (영문, 고쳐 써도 됨)
+          <textarea id="imgPrompt" class="prompt"></textarea>
+        </label>
+        <label class="f">움직임 프롬프트 (영상 AI용)
+          <textarea id="vidPrompt" class="prompt" style="min-height:80px"></textarea>
+        </label>
+        <div class="tabs">
+          <button class="btn small" id="copyImg" type="button">사진 프롬프트 복사</button>
+          <button class="btn small" id="copyVid" type="button">움직임 프롬프트 복사</button>
+        </div>
+        <div class="slider"><span>사진 위치(상하)</span><input type="range" id="focusY" min="0" max="1" step="0.01" value="0.6"><output id="focusYo">60%</output></div>
+      </div>
+
+      <div class="panel">
+        <h2><span><span class="step">4</span>글씨체</span><small>10가지 손글씨·붓글씨</small></h2>
+        <div class="fonts" id="fonts"></div>
+        <div class="slider"><span>글씨 크기</span><input type="range" id="size" min="0.6" max="1.5" step="0.01" value="1"><output id="sizeo">100%</output></div>
+        <div class="slider"><span>저자 크기</span><input type="range" id="asize" min="0.6" max="1.6" step="0.01" value="1"><output id="asizeo">100%</output></div>
+        <div class="slider"><span>줄 간격</span><input type="range" id="lh" min="0.8" max="1.5" step="0.01" value="1"><output id="lho">100%</output></div>
+        <label class="f">글자 색
+          <div class="seg" id="inkSeg" role="group" aria-label="글자 색">
+            <button type="button" data-v="auto" aria-pressed="true">자동</button>
+            <button type="button" data-v="dark" aria-pressed="false">먹색</button>
+            <button type="button" data-v="light" aria-pressed="false">흰색</button>
+          </div>
+        </label>
+        <label class="f">글 위치
+          <div class="seg" id="posSeg" role="group" aria-label="글 위치">
+            <button type="button" data-v="top" aria-pressed="true">위쪽 (하늘 자리)</button>
+            <button type="button" data-v="center" aria-pressed="false">가운데</button>
+          </div>
+        </label>
+      </div>
+
+      <div class="panel">
+        <h2><span><span class="step">5</span>움직임과 색감</span></h2>
+        <label class="f">글이 나타나는 방식
+          <div class="seg" id="animSeg" role="group" aria-label="글 등장 방식"></div>
+        </label>
+        <label class="f">배경 움직임
+          <div class="seg" id="motionSeg" role="group" aria-label="배경 움직임"></div>
+        </label>
+        <label class="f">색감
+          <div class="seg" id="gradeSeg" role="group" aria-label="색감"></div>
+        </label>
+        <div class="slider"><span>상단 밝게</span><input type="range" id="haze" min="0" max="0.8" step="0.01" value="0.32"><output id="hazeo">32%</output></div>
+        <div class="slider"><span>필름 입자</span><input type="range" id="grain" min="0" max="0.25" step="0.01" value="0.07"><output id="graino">7%</output></div>
+        <label class="check"><input type="checkbox" id="fadeOut"> 끝에서 글이 서서히 사라지기</label>
+      </div>
+
+      <div class="panel">
+        <h2><span><span class="step">6</span>배경 음악</span><small>저작권 걱정 없는 자체 생성 음악</small></h2>
+        <label class="f">분위기
+          <select id="music"></select>
+        </label>
+        <label class="f">내 음악 올리기 (mp3·m4a·wav, 선택)
+          <input type="file" id="musicFile" accept="audio/*">
+        </label>
+        <div class="slider"><span>음량</span><input type="range" id="vol" min="0" max="1" step="0.01" value="0.7"><output id="volo">70%</output></div>
+      </div>
+
+      <div class="panel">
+        <h2><span><span class="step">7</span>화면과 길이</span></h2>
+        <label class="f">화면 비율
+          <div class="seg" id="ratioSeg" role="group" aria-label="화면 비율"></div>
+        </label>
+        <label class="f">영상 길이
+          <div class="seg" id="durSeg" role="group" aria-label="영상 길이"></div>
+        </label>
+        <label class="f">저장 화질
+          <div class="seg" id="qSeg" role="group" aria-label="저장 화질">
+            <button type="button" data-v="1" aria-pressed="true">1080p 고화질</button>
+            <button type="button" data-v="0.6667" aria-pressed="false">720p 가볍게</button>
+          </div>
+        </label>
+        <p class="note">영상은 실제 길이만큼 녹화됩니다. 녹화 중에는 이 화면을 켜 둔 채 기다려 주세요.</p>
+      </div>
+    </section>
+  </div>
+  <footer>한줄 글영상 스튜디오 · 강산부동산 홍웅경</footer>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const easeOut = p => 1 - Math.pow(1 - p, 3);
+const easeInOut = p => -(Math.cos(Math.PI * p) - 1) / 2;
+function rng(seed){ let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+/* ---------------- 데이터 ---------------- */
+const FONTS = [
+  {f:"Nanum Brush Script", n:"나눔 붓글씨 ★", k:1.2},
+  {f:"Nanum Pen Script", n:"나눔 펜글씨", k:1.16},
+  {f:"Hi Melody", n:"맑은 손글씨", k:1.0},
+  {f:"East Sea Dokdo", n:"동해 붓글씨", k:1.14},
+  {f:"Dokdo", n:"독도 펜", k:1.0},
+  {f:"Gaegu", n:"개구 손글씨", k:0.95},
+  {f:"Gamja Flower", n:"감자꽃", k:0.98},
+  {f:"Yeon Sung", n:"연성체", k:0.95},
+  {f:"Song Myung", n:"송명 붓명조", k:0.9},
+  {f:"Gowun Batang", n:"고운 바탕", k:0.86},
+];
+const AUTHOR_FONT = "Gowun Batang";
+
+const KOREAN = "All people in the scene are Korean (ethnically Korean adults with natural Korean appearance, hairstyles and everyday Korean clothing).";
+const COMMON = "Composition: the upper 45% of the frame is calm, clean negative space (soft sky, mist or plain background) reserved for text; the main subject is small and placed in the lower third. Style: cinematic film photograph, 35mm lens, soft natural light, gentle pastel color grading, slightly faded highlights, subtle film grain, photorealistic, high detail. No text, no letters, no watermark, no logo, no border.";
+const MOTION_SUFFIX = "Animate subtly and slowly as a calm 8-second shot. Static tripod camera with an extremely slow push-in. No cuts, no camera shake, no text, natural realistic movement.";
+
+const SCENES = [
+  {id:"beach", n:"노을 해변 산책", d:"노을 진 동해 바닷가를 반려견과 걷는 중년 부부의 뒷모습", people:true, mood:"piano", grade:"warm",
+   img:"A Korean middle-aged couple walking a small dog along a wet sandy beach on the east coast of Korea at sunset, seen from behind as soft silhouettes, pastel orange and pink sky reflected on the wet sand, gentle waves.",
+   mo:"waves gently rolling onto the shore, the couple and the dog slowly walking away, clouds drifting",
+   g:{sky:["#f6eee0","#f8d2a4","#f3aa8c","#d9a6bb"], cloud:{c:"255,238,218",amt:.55,lo:.04,hi:.5}, sun:{x:.5,y:.62,r:.55,c:"255,214,160"}, ground:{t:"sea",y:.63,top:"#c9a6bb",bot:"#9c95b8",beach:true}}},
+  {id:"field", n:"안개 낀 들판", d:"안개 낀 보리밭에서 휴대폰을 보는 청년의 뒷모습", people:true, mood:"pad", grade:"calm",
+   img:"A young Korean man with a backpack and a cap standing in a misty green barley field in the Korean countryside at dawn, seen from behind, looking down at his phone, soft fog, tall grass in the foreground.",
+   mo:"fog slowly drifting across the field, grass swaying in a light breeze",
+   g:{sky:["#f2f3ef","#e6eae3","#d4dbcf"], cloud:{c:"255,255,255",amt:.55,lo:.35,hi:.75}, ground:{t:"field",y:.62}}},
+  {id:"summit", n:"구름 위 산 정상", d:"운해 위 바위 정상에 선 등산객 (흑백 사진)", people:true, mood:"night", grade:"mono",
+   img:"A Korean hiker in a padded winter jacket standing on a rocky summit of a Korean mountain like Seoraksan, above a vast sea of clouds, seen from behind, black and white photograph, dramatic soft clouds.",
+   mo:"clouds flowing slowly below and behind the summit",
+   g:{sky:["#f3f3f3","#dedede","#c4c4c4"], cloud:{c:"252,252,252",amt:.95,lo:0,hi:.86}, ground:{t:"ridge",y:.86,color:"#1c1c1c",peak:true}, mono:true}},
+  {id:"city", n:"해질녘 도시 전망", d:"언덕 위에서 서울 야경을 내려다보는 청년", people:true, mood:"night", grade:"film",
+   img:"A young Korean man in a denim jacket standing on a hilltop overlooking the city lights of Seoul at dusk, seen from behind, wind in his hair, hazy purple-pink twilight sky, distant mountains.",
+   mo:"city lights twinkling, his hair moving in the wind, haze drifting",
+   g:{sky:["#dbd6d5","#d0bfc3","#a99eab"], cloud:{c:"240,225,228",amt:.25,lo:.05,hi:.4}, ground:{t:"city",y:.6}}},
+  {id:"pier", n:"포항 바닷가 방파제", d:"흐린 아침 방파제 난간의 부부와 낚시하는 어르신", people:true, mood:"piano", grade:"film",
+   img:"A Korean couple in their thirties standing by the railing of a seaside breakwater in Pohang, Korea on a hazy morning, one holding a canned coffee, an elderly Korean man fishing nearby, muted film tones, calm gray sea.",
+   mo:"calm sea rippling, the couple chatting quietly, the fishing line moving slightly",
+   g:{sky:["#f1f0eb","#e9e7e0","#dddcd5"], cloud:{c:"255,255,255",amt:.2,lo:.1,hi:.5}, ground:{t:"sea",y:.66,top:"#cacbc7",bot:"#a3a6a3"}}},
+  {id:"lake", n:"산정 호수 여행", d:"설산과 호수 앞 바위에 선 여행자", people:true, mood:"hope", grade:"natural",
+   img:"A Korean traveler with a backpack standing on a rock at the edge of a clear alpine lake surrounded by snow-capped mountains, seen from behind, bright blue sky with one large white cumulus cloud.",
+   mo:"water rippling gently, the cloud slowly moving",
+   g:{sky:["#6ea2d6","#93bce5","#cfe2f2"], cloud:{c:"255,255,255",amt:.85,lo:.3,hi:.62}, ground:{t:"lake",y:.6}}},
+  {id:"flower", n:"작은 들꽃", d:"분홍빛 흐림 속 파란 들꽃 한 송이 (인물 없음)", people:false, mood:"musicbox", grade:"calm",
+   img:"A single delicate small blue wildflower on a thin stem, extreme close-up macro, soft pink and cream bokeh background, dreamy pastel light. No people.",
+   mo:"the flower swaying very gently in a soft breeze, bokeh shimmering",
+   g:{t:"flower"}},
+  {id:"pinwheel", n:"바람개비 하늘", d:"파란 하늘과 뭉게구름 (인물 없음)", people:false, mood:"hope", grade:"natural",
+   img:"A blue and white paper pinwheel held up against a bright blue summer sky with fluffy white clouds, low angle. No people visible.",
+   mo:"the pinwheel spinning slowly, clouds drifting",
+   g:{sky:["#3d7dc3","#6aa1da","#a7c9eb"], cloud:{c:"255,255,255",amt:1,lo:0,hi:1}, ground:{t:"none"}}},
+  {id:"whale", n:"고래의 바다", d:"잿빛 바다 위로 솟구치는 혹등고래 (인물 없음)", people:false, mood:"pad", grade:"calm",
+   img:"A humpback whale breaching out of a calm gray sea off the coast of Korea, water splashing, overcast pale gray sky, muted monochrome tones. No people.",
+   mo:"the whale rising slowly out of the water in slow motion, spray falling",
+   g:{sky:["#eaebeb","#d8dadb","#c4c7c9"], cloud:{c:"250,250,250",amt:.45,lo:.05,hi:.6}, ground:{t:"sea",y:.7,top:"#8f9498",bot:"#4c5256"}}},
+  {id:"hill", n:"언덕 위 사람들", d:"해질녘 연못가 언덕의 연인과 친구들 실루엣", people:true, mood:"night", grade:"film",
+   img:"Silhouettes of a young Korean couple walking and a few Korean friends talking on a low hill beside a still pond at twilight, their reflections in the water, deep blue-violet sky fading to warm orange at the horizon.",
+   mo:"the couple walking slowly, gentle ripples spreading on the pond",
+   g:{sky:["#5e6797","#9a95b9","#d9aa8b","#e9b27f"], cloud:{c:"230,215,230",amt:.18,lo:.05,hi:.45}, ground:{t:"pond",y:.66}}},
+  {id:"ginkgo", n:"가을 은행나무길", d:"노란 은행잎이 지는 길을 걷는 여성", people:true, mood:"piano", grade:"warm",
+   img:"A Korean woman in a beige trench coat walking away down a path lined with golden ginkgo trees in autumn in Korea, yellow leaves falling, warm afternoon sunlight, soft background blur.",
+   mo:"yellow ginkgo leaves falling slowly, the woman walking away",
+   g:{t:"bokeh"}},
+  {id:"hanok", n:"한옥 처마 아래 비", d:"비 오는 한옥 마루에 앉은 할머니", people:true, mood:"pad", grade:"calm",
+   img:"A Korean grandmother in a simple cardigan sitting on the wooden porch (maru) of a traditional Korean hanok, seen from the side, quiet rain falling from the tiled eaves, soft gray light, calm and nostalgic.",
+   mo:"rain dripping from the eaves, gentle steam rising from a teacup",
+   g:{sky:["#e7e8e7","#d9dbda","#c5c8c7"], cloud:{c:"255,255,255",amt:.5,lo:.2,hi:.8}, ground:{t:"ridge",y:.8,color:"#4a4e4d"}}},
+];
+
+const SAMPLES = [
+  {t:"하루라도 책을 읽지 않으면\n입 안에 가시가 돋는다", a:"안중근", s:"독립운동가"},
+  {t:"죽고자 하면 살 것이요\n살고자 하면 죽을 것이다", a:"이순신", s:"<난중일기>"},
+  {t:"배우고 때때로 익히면\n또한 기쁘지 아니한가", a:"공자", s:"<논어>"},
+  {t:"천 리 길도\n발밑에서 시작된다", a:"노자", s:"<도덕경>"},
+  {t:"서두르지 말라\n그러나 멈추지도 말라", a:"괴테", s:"독일 작가"},
+  {t:"가는 말이 고와야\n오는 말이 곱다", a:"", s:"우리 속담"},
+];
+
+const ANIMS = [["write","손글씨 쓰듯"],["fadeup","아래서 떠오르기"],["fade","서서히"],["blur","흐림→선명"],["type","한 글자씩"],["all","전체 한 번에"]];
+const MOTIONS = [["in","천천히 다가가기"],["out","천천히 멀어지기"],["pan","옆으로 흐르기"],["none","고정"]];
+const GRADES = [["scene","장면 기본"],["natural","자연"],["warm","따뜻한"],["film","필름"],["calm","차분한"],["mono","흑백"]];
+const GRADE_FILTER = {natural:"saturate(1.02) contrast(1.0)", warm:"saturate(0.92) sepia(0.12) brightness(1.03) contrast(0.96)", film:"saturate(0.8) contrast(0.9) brightness(1.04) sepia(0.07)", calm:"saturate(0.72) contrast(0.9) brightness(1.06)", mono:"grayscale(1) contrast(0.94) brightness(1.05)"};
+const RATIOS = {"9:16":[1080,1920,.165], "4:5":[1080,1350,.14], "1:1":[1080,1080,.14], "16:9":[1920,1080,.17]};
+const MUSIC = {
+  auto:"자동 (장면에 맞춤)", piano:"잔잔한 피아노", pad:"따뜻한 앰비언트", night:"새벽 감성", hope:"희망의 아침", musicbox:"오르골", none:"음악 없음"
+};
+
+/* ---------------- 상태 ---------------- */
+const S = {text:SAMPLES[0].t, author:SAMPLES[0].a, source:SAMPLES[0].s, brand:"강산부동산",
+  scene:"beach", font:FONTS[0].f, anim:"write", motion:"in", grade:"scene", haze:.32, grain:.07, ink:"auto",
+  size:1, asize:1, lh:1, pos:"top", focusY:.6, ratio:"9:16", dur:10, music:"auto", vol:.7, fadeOut:false, q:1, bg:"ai"};
+const SAVE_KEYS = ["text","author","source","brand","scene","font","anim","motion","grade","haze","grain","ink","size","asize","lh","pos","ratio","dur","music","vol","fadeOut","q"];
+try { const saved = JSON.parse(localStorage.getItem("gyv-state") || "null"); if (saved) for (const k of SAVE_KEYS) if (k in saved) S[k] = saved[k]; } catch(e) {}
+let saveT = 0;
+function persist(){ clearTimeout(saveT); saveT = setTimeout(() => { try { const o = {}; SAVE_KEYS.forEach(k => o[k] = S[k]); localStorage.setItem("gyv-state", JSON.stringify(o)); } catch(e) {} }, 400); }
+
+const cv = $("#cv"); const ctx = cv.getContext("2d");
+const FILTER_OK = typeof ctx.filter === "string";
+let FW = 1080, FH = 1920, K = .5;
+let src = {type:"scene"};       // {type:'scene'|'image'|'video', el, w, h}
+let base = null;               // 보정 적용된 배경 캔버스 (사진/그림)
+let inkMode = {dark:true};
+const ZMAX = 1.16;
+const sceneOf = id => SCENES.find(s => s.id === id) || SCENES[0];
+const fontOf = f => FONTS.find(x => x.f === f) || FONTS[0];
+
+/* ---------------- 그림 배경 생성기 ---------------- */
+function makeNoise(seed){ const R = rng(seed), P = new Float32Array(65536); for (let i=0;i<65536;i++) P[i]=R();
+  const n = (x,y) => { const xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi, u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf);
+    const a=P[((yi&255)<<8)|(xi&255)], b=P[((yi&255)<<8)|((xi+1)&255)], c=P[(((yi+1)&255)<<8)|(xi&255)], d=P[(((yi+1)&255)<<8)|((xi+1)&255)];
+    return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v; };
+  return (x,y,o=5) => { let s=0,amp=1,f=1,norm=0; for(let i=0;i<o;i++){ s+=amp*n(x*f+i*17.3,y*f+i*9.1); norm+=amp; amp*=.5; f*=2; } return s/norm; };
+}
+function blurDraw(g, img, x, y, w, h, px){ if (FILTER_OK && px > 0) { g.filter = `blur(${px}px)`; } g.drawImage(img, x, y, w, h); if (FILTER_OK) g.filter = "none"; }
+function skyGrad(g, W, H, cols, to){ const gr = g.createLinearGradient(0,0,0,to); cols.forEach((c,i)=>gr.addColorStop(i/(cols.length-1), c)); g.fillStyle = gr; g.fillRect(0,0,W,to); }
+function clouds(g, W, H, cl, seed, bottom){
+  const w = Math.max(16, Math.ceil(W/8)), h = Math.max(16, Math.ceil(H/8)); const c = document.createElement("canvas"); c.width=w; c.height=h;
+  const cg = c.getContext("2d"), im = cg.createImageData(w,h), N = makeNoise(seed); const [r,gg,b] = cl.c.split(",").map(Number);
+  for (let y=0;y<h;y++){ const yy=y/h; const m = clamp((yy-cl.lo)/.12,0,1)*clamp((cl.hi-yy)/.18,0,1);
+    for (let x=0;x<w;x++){ const v = N(x/w*3.2, y/h*7.5, 5); const a = clamp((v-.42)/.3,0,1); const al = a*a*(3-2*a)*cl.amt*m; const i=(y*w+x)*4; im.data[i]=r; im.data[i+1]=gg; im.data[i+2]=b; im.data[i+3]=al*255; } }
+  cg.putImageData(im,0,0); blurDraw(g, c, 0, 0, W, bottom||H, W/140);
+}
+function ridge(g, W, H, y, amp, color, seed, peak){ const N = makeNoise(seed); g.beginPath(); g.moveTo(0,H);
+  for (let x=0;x<=W;x+=Math.max(2,W/200)){ let yy = y - N(x/W*4,1.3,4)*amp; if (peak) yy -= Math.exp(-Math.pow((x-W*.5)/(W*.16),2))*H*.05; g.lineTo(x,yy); }
+  g.lineTo(W,H); g.closePath(); g.fillStyle = color; g.fill(); }
+function genScene(sc, W, H){
+  const c = document.createElement("canvas"); c.width=W; c.height=H; const g = c.getContext("2d"); const R = rng(sc.id.length*977+W); const G = sc.g;
+  if (G.t === "flower"){
+    g.fillStyle="#ebe0df"; g.fillRect(0,0,W,H);
+    const blobs=[["#e9b7b2",.3,.35,.5],["#f4ede6",.75,.2,.45],["#e3a9a2",.8,.7,.5],["#f2e6e2",.2,.85,.45],["#d99d98",.55,.55,.35]];
+    blobs.forEach(([col,x,y,r]) => { g.save(); if (FILTER_OK) g.filter=`blur(${W/14}px)`; g.fillStyle=col; g.beginPath(); g.arc(W*x,H*y,W*r,0,7); g.fill(); g.restore(); });
+    g.strokeStyle="#5a4646"; g.lineWidth=W*.006; g.beginPath(); g.moveTo(W*.5,H*1.02); g.bezierCurveTo(W*.52,H*.85,W*.47,H*.72,W*.5,H*.6); g.stroke();
+    const petal=(cx,cy,s)=>{ for(let i=0;i<5;i++){ const a=i/5*Math.PI*2-.3; g.save(); g.translate(cx+Math.cos(a)*s*.55, cy+Math.sin(a)*s*.45); g.rotate(a); const gr=g.createRadialGradient(0,0,0,0,0,s*.6); gr.addColorStop(0,"#9cc0ee"); gr.addColorStop(1,"#5f8fd6"); g.fillStyle=gr; g.beginPath(); g.ellipse(0,0,s*.6,s*.42,0,0,7); g.fill(); g.restore(); } g.fillStyle="#26304a"; g.beginPath(); g.arc(cx,cy,s*.22,0,7); g.fill(); };
+    petal(W*.47,H*.585,W*.07); petal(W*.56,H*.6,W*.06);
+    return c;
+  }
+  if (G.t === "bokeh"){
+    const gr=g.createLinearGradient(0,0,0,H); gr.addColorStop(0,"#f5ecd0"); gr.addColorStop(.45,"#ecc76d"); gr.addColorStop(1,"#8d6b25"); g.fillStyle=gr; g.fillRect(0,0,W,H);
+    for (let i=0;i<70;i++){ const x=R()*W, y=H*(.35+R()*.65), r=W*(.015+R()*.07); g.save(); if (FILTER_OK) g.filter=`blur(${r*.25}px)`; g.globalAlpha=.15+R()*.35; g.fillStyle=["#ffe08a","#f5c542","#fff2c2","#e6a730"][i%4]; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); g.restore(); }
+    const top=g.createLinearGradient(0,0,0,H*.5); top.addColorStop(0,"rgba(250,244,226,.85)"); top.addColorStop(1,"rgba(250,244,226,0)"); g.fillStyle=top; g.fillRect(0,0,W,H*.5);
+    return c;
+  }
+  const gy = G.ground.t === "none" ? H : H*G.ground.y;
+  skyGrad(g, W, H, G.sky, G.ground.t === "none" ? H : gy);
+  if (G.ground.t === "none") {} else { g.fillStyle = G.sky[G.sky.length-1]; g.fillRect(0, gy, W, H-gy); }
+  if (G.sun){ const s=G.sun; const rg=g.createRadialGradient(W*s.x,H*s.y,0,W*s.x,H*s.y,W*s.r); rg.addColorStop(0,`rgba(${s.c},.85)`); rg.addColorStop(1,`rgba(${s.c},0)`); g.fillStyle=rg; g.fillRect(0,0,W,H); }
+  clouds(g, W, H, G.cloud, sc.id.length*31+7, gy);
+  const T = G.ground.t;
+  if (T === "sea"){
+    const gr=g.createLinearGradient(0,gy,0,H); gr.addColorStop(0,G.ground.top); gr.addColorStop(1,G.ground.bot); g.fillStyle=gr; g.fillRect(0,gy,W,H-gy);
+    for (let i=0;i<260;i++){ const y=gy+(H-gy)*Math.pow(R(),1.7); const w=W*(.03+R()*.25); g.fillStyle=`rgba(255,255,255,${.05+R()*.14})`; g.fillRect(R()*W-w*.3, y, w, Math.max(1,(y-gy)/(H-gy)*W*.004)); }
+    if (G.ground.beach){ const by=H*.8; const sg=g.createLinearGradient(0,by,0,H); sg.addColorStop(0,"rgba(240,170,135,.0)"); sg.addColorStop(.15,"rgba(240,170,135,.85)"); sg.addColorStop(1,"rgba(225,140,115,1)"); g.fillStyle=sg; g.fillRect(0,by,W,H-by);
+      const rg=g.createRadialGradient(W*.5,H*.9,0,W*.5,H*.9,W*.45); rg.addColorStop(0,"rgba(255,225,190,.55)"); rg.addColorStop(1,"rgba(255,225,190,0)"); g.fillStyle=rg; g.fillRect(0,by,W,H-by);
+      g.strokeStyle="rgba(255,255,255,.55)"; g.lineWidth=W*.004; g.beginPath(); for(let x=0;x<=W;x+=W/60){ const yy=by+H*.018+Math.sin(x/W*9)*H*.004; x?g.lineTo(x,yy):g.moveTo(x,yy);} g.stroke(); }
+    const hz=g.createLinearGradient(0,gy-H*.02,0,gy+H*.04); hz.addColorStop(0,"rgba(255,255,255,0)"); hz.addColorStop(.5,"rgba(255,255,255,.35)"); hz.addColorStop(1,"rgba(255,255,255,0)"); g.fillStyle=hz; g.fillRect(0,gy-H*.02,W,H*.06);
+  } else if (T === "field"){
+    ridge(g,W,H,gy,H*.03,"rgba(120,135,118,.55)",3);
+    const gr=g.createLinearGradient(0,gy,0,H); gr.addColorStop(0,"#a7b897"); gr.addColorStop(.5,"#6c8757"); gr.addColorStop(1,"#3c5630"); g.fillStyle=gr; g.fillRect(0,gy+H*.01,W,H);
+    for (let i=0;i<2600;i++){ const y=gy+(H-gy)*Math.pow(R(),.8); const d=(y-gy)/(H-gy); g.strokeStyle=`rgba(${30+R()*40|0},${60+R()*50|0},${25+R()*30|0},${.25+d*.5})`; g.lineWidth=1+d*W*.003; const x=R()*W, l=H*(.004+d*.05); g.beginPath(); g.moveTo(x,y); g.lineTo(x+(R()-.5)*l*.4,y-l); g.stroke(); }
+    const fog=g.createLinearGradient(0,gy-H*.08,0,gy+H*.14); fog.addColorStop(0,"rgba(240,243,238,0)"); fog.addColorStop(.45,"rgba(240,243,238,.75)"); fog.addColorStop(1,"rgba(240,243,238,0)"); g.fillStyle=fog; g.fillRect(0,gy-H*.08,W,H*.22);
+  } else if (T === "ridge"){
+    ridge(g,W,H,gy-H*.04,H*.05,"rgba(120,120,120,.35)",11);
+    ridge(g,W,H,gy,H*.06,G.ground.color,5,G.ground.peak);
+  } else if (T === "city"){
+    ridge(g,W,H,gy-H*.02,H*.05,"rgba(120,112,128,.7)",8);
+    const gr=g.createLinearGradient(0,gy,0,H); gr.addColorStop(0,"#5d5563"); gr.addColorStop(1,"#1f1b22"); g.fillStyle=gr; g.fillRect(0,gy,W,H);
+    for (let i=0;i<2200;i++){ const y=gy+H*.01+(H-gy)*Math.pow(R(),1.3); const d=(y-gy)/(H-gy); g.fillStyle = R()<.75 ? `rgba(255,${200+R()*40|0},${130+R()*60|0},${.35+R()*.6})` : `rgba(235,240,255,${.3+R()*.5})`; const r=W*(.0008+d*.0028)*(.6+R()); g.beginPath(); g.arc(R()*W,y,r,0,7); g.fill(); }
+    const hz=g.createLinearGradient(0,gy-H*.05,0,gy+H*.08); hz.addColorStop(0,"rgba(210,190,200,0)"); hz.addColorStop(.5,"rgba(210,190,200,.45)"); hz.addColorStop(1,"rgba(210,190,200,0)"); g.fillStyle=hz; g.fillRect(0,gy-H*.05,W,H*.13);
+  } else if (T === "lake"){
+    ridge(g,W,H,gy,H*.12,"#9aa6b3",21,true); ridge(g,W,H,gy+H*.05,H*.08,"#55654f",22); ridge(g,W,H,gy+H*.09,H*.04,"#2f402d",23);
+    const wy=H*.74; const tmp=document.createElement("canvas"); tmp.width=W; tmp.height=wy; tmp.getContext("2d").drawImage(c,0,0);
+    g.save(); g.globalAlpha=.45; g.translate(0,wy*2); g.scale(1,-1); g.drawImage(tmp,0,wy-(H-wy),W,H-wy,0,wy-(H-wy),W,H-wy); g.restore();
+    const wg=g.createLinearGradient(0,wy,0,H); wg.addColorStop(0,"rgba(70,120,118,.55)"); wg.addColorStop(1,"rgba(30,70,70,.85)"); g.fillStyle=wg; g.fillRect(0,wy,W,H-wy);
+    for (let i=0;i<120;i++){ g.fillStyle=`rgba(255,255,255,${.04+R()*.1})`; g.fillRect(R()*W, wy+(H-wy)*R(), W*(.03+R()*.15), 2); }
+  } else if (T === "pond"){
+    const wy=H*.72; ridge(g,W,H,gy,H*.03,"#16151a",31);
+    const tmp=document.createElement("canvas"); tmp.width=W; tmp.height=gy; tmp.getContext("2d").drawImage(c,0,0);
+    g.save(); g.translate(0,H+wy); g.scale(1,-1); g.globalAlpha=.75; g.drawImage(tmp,0,gy-(H-wy),W,H-wy,0,H-(H-wy)-(H-wy)+(H-wy),W,H-wy); g.restore();
+    g.fillStyle="rgba(10,10,20,.4)"; g.fillRect(0,wy,W,H-wy);
+    g.strokeStyle="rgba(255,255,255,.12)"; g.lineWidth=W*.002; for(let i=1;i<7;i++){ g.beginPath(); g.ellipse(W*.4,wy+(H-wy)*.55,W*.06*i,H*.008*i,0,0,7); g.stroke(); }
+  }
+  if (G.mono){ const d=g.getImageData(0,0,W,H); for(let i=0;i<d.data.length;i+=4){ const l=d.data[i]*.3+d.data[i+1]*.59+d.data[i+2]*.11; d.data[i]=d.data[i+1]=d.data[i+2]=l; } g.putImageData(d,0,0); }
+  return c;
+}
+const sceneCache = new Map();
+function sceneCanvas(id, W, H){ const key=id+W+"x"+H; if (!sceneCache.has(key)) sceneCache.set(key, genScene(sceneOf(id), W, H)); return sceneCache.get(key); }
+
+/* ---------------- 배경 준비 ---------------- */
+function gradeKey(){ return S.grade === "scene" ? sceneOf(S.scene).grade : S.grade; }
+function buildBase(){
+  base = null;
+  if (src.type === "video") { sampleInk(); return; }
+  const s = src.type === "scene" ? sceneCanvas(S.scene, FW, FH) : src.el;
+  const sw = src.type === "scene" ? FW : src.w, sh = src.type === "scene" ? FH : src.h;
+  const cover = Math.max(FW/sw, FH/sh) * ZMAX;
+  const c = document.createElement("canvas"); c.width = Math.ceil(sw*cover); c.height = Math.ceil(sh*cover);
+  const g = c.getContext("2d"); if (FILTER_OK) g.filter = GRADE_FILTER[gradeKey()] || "none"; g.drawImage(s, 0, 0, c.width, c.height);
+  base = c; sampleInk();
+}
+function sampleInk(){
+  const t = document.createElement("canvas"); t.width = 36; t.height = 64; const g = t.getContext("2d");
+  try {
+    if (base) g.drawImage(base, 0, 0, 36, 64);
+    else if (src.type === "video" && src.el.readyState >= 2) { if (FILTER_OK) g.filter = GRADE_FILTER[gradeKey()] || "none"; g.drawImage(src.el, 0, 0, 36, 64); }
+    else { inkMode.dark = true; return; }
+    const L = layout(); const y0 = clamp(Math.floor(L.top/FH*64),0,63), y1 = clamp(Math.ceil(L.bottom/FH*64),y0+1,64);
+    const d = g.getImageData(4, y0, 28, y1-y0).data; let sum = 0; for (let i=0;i<d.length;i+=4) sum += (d[i]*.2126+d[i+1]*.7152+d[i+2]*.0722)/255;
+    inkMode.lum = sum/(d.length/4); inkMode.dark = inkMode.lum > .42;
+  } catch(e) { inkMode.dark = true; }
+}
+function inkDark(){ return S.ink === "auto" ? inkMode.dark : S.ink === "dark"; }
+
+/* ---------------- 글 배치 ---------------- */
+let layoutCache = null, layoutKey = "";
+function fontCss(px, fam){ return `${px}px "${fam}", "Gowun Batang", serif`; }
+function wrapLine(g, line, maxW){
+  if (g.measureText(line).width <= maxW) return [line];
+  const words = line.split(/\s+/); const out = []; let cur = "";
+  for (const w of words){ const t = cur ? cur + " " + w : w; if (cur && g.measureText(t).width > maxW){ out.push(cur); cur = w; } else cur = t; }
+  if (cur) out.push(cur); return out;
+}
+function authorLine(){ const a = S.author.trim(), s = S.source.trim(); if (!a && !s) return ""; return "-" + [a, s].filter(Boolean).join(", ") + "-"; }
+function layout(){
+  const key = [S.text,S.author,S.source,S.brand,S.font,S.size,S.asize,S.lh,S.pos,FW,FH].join("|");
+  if (key === layoutKey && layoutCache) return layoutCache;
+  const F = fontOf(S.font); const g = ctx; g.save(); g.setTransform(1,0,0,1,0,0);
+  const narrow = Math.min(FW, FH*0.75);
+  let size = narrow * .072 * F.k * S.size; const maxW = FW * .86; let lines = [];
+  const user = S.text.split("\n").map(s => s.trim()).filter(Boolean);
+  for (let i=0;i<10;i++){ g.font = fontCss(size, F.f); lines = []; user.forEach(l => lines.push(...wrapLine(g, l, maxW)));
+    if (lines.length * size * 1.6 * S.lh < FH * .52 || size < narrow*.03) break; size *= .92; }
+  const lh = size * 1.6 * S.lh;
+  const aSize = narrow * .034 * S.asize; const aText = authorLine();
+  const blockH = lines.length * lh + (aText ? aSize * 2.2 : 0);
+  const top = S.pos === "top" ? FH * RATIOS[S.ratio][2] : (FH - blockH) / 2 - FH*.04;
+  const bSize = narrow * .026;
+  g.restore();
+  layoutCache = {size, lh, lines: lines.map((t,i) => ({t, y: top + lh*(i+.5)})), aText, aSize, aY: top + lines.length*lh + aSize*1.0,
+    badgeY: top - bSize*2.2, bSize, top: top - bSize*3, bottom: top + blockH};
+  layoutKey = key; return layoutCache;
+}
+
+/* ---------------- 프레임 그리기 ---------------- */
+const lineCache = new Map();
+function lineCanvas(text, size, fam, dark){
+  const key = [text,size,fam,dark].join("|"); if (lineCache.has(key)) return lineCache.get(key);
+  if (lineCache.size > 160) lineCache.clear();
+  const c = document.createElement("canvas"); const g = c.getContext("2d"); g.font = fontCss(size, fam);
+  const w = g.measureText(text).width, pad = size*.6; c.width = Math.ceil(w + pad*2); c.height = Math.ceil(size*2);
+  g.font = fontCss(size, fam); g.textBaseline = "middle"; g.textAlign = "left";
+  g.shadowColor = dark ? "rgba(255,255,255,.55)" : "rgba(0,0,0,.45)"; g.shadowBlur = size*.28;
+  g.fillStyle = dark ? "#1c1b1d" : "#fbfaf6"; g.fillText(text, pad, c.height/2);
+  const o = {c, w, pad}; lineCache.set(key, o); return o;
+}
+const tmpC = document.createElement("canvas"); const tmpG = tmpC.getContext("2d");
+let grainPat = null;
+function grainPattern(){ if (grainPat) return grainPat; const c = document.createElement("canvas"); c.width = c.height = 220; const g = c.getContext("2d"); const im = g.createImageData(220,220); const R = rng(5);
+  for (let i=0;i<im.data.length;i+=4){ const v = R()*255; im.data[i]=im.data[i+1]=im.data[i+2]=v; im.data[i+3]=255; } g.putImageData(im,0,0); grainPat = ctx.createPattern(c, "repeat"); return grainPat; }
+
+function zoomAt(t){ const p = clamp(t / S.dur, 0, 1); const e = easeInOut(p);
+  if (S.motion === "in") return {z: 1 + (ZMAX-1)*e*.9, fx: .5};
+  if (S.motion === "out") return {z: ZMAX - (ZMAX-1)*e*.9, fx: .5};
+  if (S.motion === "pan") return {z: ZMAX*.97, fx: .3 + .4*e};
+  return {z: 1.0, fx: .5};
+}
+function drawBg(t){
+  const {z, fx} = zoomAt(t);
+  if (src.type === "video" && src.el.readyState >= 2){
+    const v = src.el, vw = v.videoWidth, vh = v.videoHeight; const cover = Math.max(FW/vw, FH/vh) * (1 + (z-1)*.6);
+    const dw = vw*cover, dh = vh*cover; if (FILTER_OK) ctx.filter = GRADE_FILTER[gradeKey()] || "none";
+    ctx.drawImage(v, (FW-dw)*fx, (FH-dh)*S.focusY, dw, dh); if (FILTER_OK) ctx.filter = "none"; return;
+  }
+  if (!base) { ctx.fillStyle = "#222"; ctx.fillRect(0,0,FW,FH); return; }
+  const dw = base.width * z / ZMAX, dh = base.height * z / ZMAX;
+  ctx.drawImage(base, (FW-dw)*fx, (FH-dh)*S.focusY, dw, dh);
+}
+function drawHaze(L){
+  if (S.haze <= 0) return; const dark = inkDark(); const col = dark ? "255,255,255" : "0,0,0"; const h = S.haze * (dark ? 1 : .8);
+  const y0 = Math.max(0, L.top - FH*.12), y1 = Math.min(FH, L.bottom + FH*.22);
+  const gr = ctx.createLinearGradient(0, y0, 0, y1);
+  gr.addColorStop(0, `rgba(${col},${S.pos==="top" ? h*.9 : 0})`); gr.addColorStop(.25, `rgba(${col},${h*.85})`); gr.addColorStop(.7, `rgba(${col},${h*.5})`); gr.addColorStop(1, `rgba(${col},0)`);
+  ctx.fillStyle = gr; ctx.fillRect(0, y0, FW, y1-y0);
+  if (S.pos === "top" && y0 > 0){ ctx.fillStyle = `rgba(${col},${h*.9})`; ctx.fillRect(0,0,FW,y0); }
+}
+function drawFx(){
+  const vg = ctx.createRadialGradient(FW/2, FH/2, Math.min(FW,FH)*.35, FW/2, FH/2, Math.hypot(FW,FH)*.6);
+  vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.22)"); ctx.fillStyle = vg; ctx.fillRect(0,0,FW,FH);
+  if (S.grain > 0){ ctx.save(); ctx.globalCompositeOperation = "overlay"; ctx.globalAlpha = S.grain*1.6; const ox = Math.random()*220|0, oy = Math.random()*220|0;
+    ctx.translate(-ox, -oy); ctx.fillStyle = grainPattern(); ctx.fillRect(ox, oy, FW, FH); ctx.restore(); }
+}
+function timing(n){
+  const start = .7, end = S.dur * .6; const gap = (end - start) / Math.max(1, n);
+  const rev = S.anim === "write" ? clamp(gap*1.05, .7, 1.9) : S.anim === "type" ? clamp(gap*.95, .6, 1.8) : clamp(gap*1.2, .6, 1.4);
+  return {start, gap, rev, authorAt: end + .15};
+}
+function drawText(t, L){
+  const F = fontOf(S.font), dark = inkDark(); const n = L.lines.length; const T = timing(n);
+  const outA = S.fadeOut ? clamp((S.dur - t) / .7, 0, 1) : 1;
+  // 브랜드 배지
+  if (S.brand.trim()){
+    const a = clamp((t - .1) / .6, 0, 1) * outA;
+    if (a > 0){ ctx.save(); ctx.globalAlpha = a; ctx.font = fontCss(L.bSize, AUTHOR_FONT); const tw = ctx.measureText(S.brand.trim()).width;
+      const w = tw + L.bSize*1.8, h = L.bSize*1.85, x = FW/2 - w/2, y = L.badgeY - h/2;
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x,y,w,h,h/2); else ctx.rect(x,y,w,h);
+      ctx.fillStyle = dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.18)"; ctx.fill();
+      ctx.lineWidth = Math.max(1.5, L.bSize*.07); ctx.strokeStyle = dark ? "rgba(40,40,40,.45)" : "rgba(255,255,255,.6)"; ctx.stroke();
+      ctx.fillStyle = dark ? "rgba(40,40,40,.62)" : "rgba(255,255,255,.85)"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(S.brand.trim(), FW/2, L.badgeY + L.bSize*.05);
+      ctx.restore(); }
+  }
+  L.lines.forEach((ln, i) => {
+    let p = S.anim === "all" ? clamp((t - T.start) / 1.4, 0, 1) : clamp((t - (T.start + T.gap*i)) / T.rev, 0, 1);
+    if (p <= 0) return; const lc = lineCanvas(ln.t, L.size, F.f, dark); const x = FW/2 - lc.c.width/2, y = ln.y - lc.c.height/2;
+    ctx.save(); ctx.globalAlpha = outA;
+    if (S.anim === "write" && p < 1){
+      const e = easeInOut(p), feather = L.size*1.1; const rx = e * (lc.c.width + feather);
+      if (tmpC.width < lc.c.width || tmpC.height < lc.c.height){ tmpC.width = Math.max(tmpC.width, lc.c.width); tmpC.height = Math.max(tmpC.height, lc.c.height); }
+      tmpG.globalCompositeOperation = "source-over"; tmpG.clearRect(0,0,tmpC.width,tmpC.height); tmpG.drawImage(lc.c, 0, 0);
+      tmpG.globalCompositeOperation = "destination-in"; const gr = tmpG.createLinearGradient(rx - feather, 0, rx, 0); gr.addColorStop(0,"rgba(0,0,0,1)"); gr.addColorStop(1,"rgba(0,0,0,0)");
+      tmpG.fillStyle = gr; tmpG.fillRect(0, 0, lc.c.width, lc.c.height); tmpG.globalCompositeOperation = "source-over";
+      ctx.globalAlpha *= clamp(p*4, 0, 1); ctx.drawImage(tmpC, 0, 0, lc.c.width, lc.c.height, x, y, lc.c.width, lc.c.height);
+    } else if (S.anim === "type" && p < 1){
+      const chars = Array.from(ln.t); const k = p * chars.length; const full = Math.floor(k);
+      ctx.font = fontCss(L.size, F.f); ctx.textBaseline = "middle"; ctx.textAlign = "left";
+      ctx.shadowColor = dark ? "rgba(255,255,255,.55)" : "rgba(0,0,0,.45)"; ctx.shadowBlur = L.size*.28*K; ctx.fillStyle = dark ? "#1c1b1d" : "#fbfaf6";
+      const sx = FW/2 - lc.w/2; const shown = chars.slice(0, full).join(""); ctx.fillText(shown, sx, ln.y);
+      if (full < chars.length){ ctx.globalAlpha *= k - full; ctx.fillText(chars[full], sx + ctx.measureText(shown).width, ln.y); }
+    } else if (S.anim === "fadeup" && p < 1){
+      const e = easeOut(p); ctx.globalAlpha *= e; ctx.drawImage(lc.c, x, y + (1-e)*L.size*.45);
+    } else if (S.anim === "blur" && p < 1){
+      const e = easeOut(p); ctx.globalAlpha *= e; if (FILTER_OK) ctx.filter = `blur(${(1-e)*L.size*.16*K}px)`; ctx.drawImage(lc.c, x, y); if (FILTER_OK) ctx.filter = "none";
+    } else {
+      ctx.globalAlpha *= p < 1 ? easeOut(p) : 1; ctx.drawImage(lc.c, x, y);
+    }
+    ctx.restore();
+  });
+  if (L.aText){
+    const a = clamp((t - (S.anim === "all" ? 2.2 : T.authorAt)) / .8, 0, 1) * outA;
+    if (a > 0){ ctx.save(); ctx.globalAlpha = a; ctx.font = fontCss(L.aSize, AUTHOR_FONT); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.shadowColor = dark ? "rgba(255,255,255,.5)" : "rgba(0,0,0,.4)"; ctx.shadowBlur = L.aSize*.3*K;
+      ctx.fillStyle = dark ? "rgba(48,46,48,.82)" : "rgba(255,255,255,.88)"; ctx.fillText(L.aText, FW/2, L.aY + (1-easeOut(a))*L.aSize*.3); ctx.restore(); }
+  }
+}
+function frame(t){
+  ctx.setTransform(K,0,0,K,0,0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  const L = layout(); drawBg(t); drawHaze(L); drawFx(); drawText(t, L);
+}
+
+/* ---------------- 음악 엔진 (자체 합성) ---------------- */
+let AC = null;
+function ac(){ if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); return AC; }
+const NOTE = m => 440 * Math.pow(2, (m - 69) / 12);
+const MOODS = {
+  piano:{bpm:68, ch:[[48,55,64,71],[45,52,60,67],[41,48,57,64],[43,50,59,62]], piano:1, pad:.022},
+  pad:{bpm:58, ch:[[50,57,62,66,69],[47,54,59,62,66],[43,50,55,59,62],[45,52,57,61,64]], piano:.35, pad:.034},
+  night:{bpm:62, ch:[[45,52,59,64,67],[41,48,57,64],[48,55,64,67],[43,50,59,62]], piano:.55, pad:.03},
+  hope:{bpm:76, ch:[[50,57,62,66],[45,52,57,61],[47,54,59,62],[43,50,55,59]], piano:1, pad:.02},
+  musicbox:{bpm:72, ch:[[60,64,67,72],[57,60,64,69],[53,57,60,65],[55,59,62,67]], box:1, pad:.012},
+};
+let impulse = null;
+function getImpulse(a){ if (impulse && impulse.sampleRate === a.sampleRate) return impulse; const len = a.sampleRate*3; const b = a.createBuffer(2, len, a.sampleRate); const R = rng(9);
+  for (let c=0;c<2;c++){ const d = b.getChannelData(c); for (let i=0;i<len;i++) d[i] = (R()*2-1) * Math.pow(1 - i/len, 3); } impulse = b; return b; }
+function voicePiano(a, out, t, m, vel, len){ const f = NOTE(m); const g = a.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vel, t+.01); g.gain.exponentialRampToValueAtTime(vel*.3, t+.5); g.gain.exponentialRampToValueAtTime(.0001, t+len);
+  const lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2400; g.connect(lp); lp.connect(out);
+  [[1,"sine",1],[2,"triangle",.16],[3,"sine",.05]].forEach(([mul,type,gn]) => { const o = a.createOscillator(); o.type = type; o.frequency.value = f*mul; const og = a.createGain(); og.gain.value = gn; o.connect(og); og.connect(g); o.start(t); o.stop(t+len+.1); }); }
+function voiceBox(a, out, t, m, vel){ const f = NOTE(m); const g = a.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.linearRampToValueAtTime(vel,t+.004); g.gain.exponentialRampToValueAtTime(.0001,t+1.8); g.connect(out);
+  [[1,1],[4.2,.12],[2,.2]].forEach(([mul,gn]) => { const o = a.createOscillator(); o.type = "sine"; o.frequency.value = f*mul; const og = a.createGain(); og.gain.value = gn; o.connect(og); og.connect(g); o.start(t); o.stop(t+1.9); }); }
+function voicePad(a, out, t, m, lvl, len){ const g = a.createGain(); g.gain.setValueAtTime(.0001,t); const att = t+Math.min(1.6,len*.4); g.gain.linearRampToValueAtTime(lvl, att); g.gain.setValueAtTime(lvl, Math.max(att+.01, t+len-1)); g.gain.linearRampToValueAtTime(.0001, t+len+.6);
+  const lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 760; lp.Q.value = .4; lp.connect(g); g.connect(out);
+  [-7,7].forEach(dt => { const o = a.createOscillator(); o.type = "sawtooth"; o.frequency.value = NOTE(m); o.detune.value = dt; o.connect(lp); o.start(t); o.stop(t+len+.8); }); }
+function startMusic(outs, dur){
+  const a = ac(); const key = S.music === "auto" ? sceneOf(S.scene).mood : S.music;
+  if (key === "none" && !userMusic) return null;
+  const master = a.createGain(); const now = a.currentTime + .05; const vol = S.vol;
+  master.gain.setValueAtTime(.0001, now); master.gain.linearRampToValueAtTime(vol, now + .8); master.gain.setValueAtTime(vol, now + dur - 1.6); master.gain.linearRampToValueAtTime(.0001, now + dur);
+  const comp = a.createDynamicsCompressor(); master.connect(comp); outs.forEach(o => comp.connect(o));
+  const nodes = [];
+  if (userMusic){ const s = a.createBufferSource(); s.buffer = userMusic; s.connect(master); s.start(now); s.stop(now + dur + .1); nodes.push(s); return {master, nodes}; }
+  const bus = a.createGain(); const dry = a.createGain(); dry.gain.value = .7; const wet = a.createGain(); wet.gain.value = .5; const conv = a.createConvolver(); conv.buffer = getImpulse(a);
+  bus.connect(dry); dry.connect(master); bus.connect(conv); conv.connect(wet); wet.connect(master);
+  const M = MOODS[key]; const beat = 60 / M.bpm; const bar = beat * 4; const R = rng(Math.floor(Math.random()*1e6));
+  for (let bi = 0; bi * bar < dur; bi++){
+    const ch = M.ch[bi % M.ch.length]; const t0 = now + bi*bar; const len = Math.min(bar, dur - bi*bar);
+    if (M.pad) ch.forEach(m => voicePad(a, bus, t0, m, M.pad, len + .3));
+    voicePiano(a, bus, t0, ch[0]-12, .08, Math.min(len+1, 4));
+    if (M.piano){ const steps = [0, 1, 1.5, 2, 3, 3.5]; steps.forEach((s, si) => { if (R() > M.piano) return; const tt = t0 + s*beat; if (tt > now + dur - .8) return; const m = ch[(si + bi) % ch.length] + 12; voicePiano(a, bus, tt, m, .07 + R()*.04, 2.6); }); }
+    if (M.box){ [0,.5,1,1.5,2,2.5,3,3.5].forEach((s, si) => { const tt = t0 + s*beat; if (tt > now + dur - .6 || R() < .25) return; voiceBox(a, bus, tt, ch[(si*2 + bi) % ch.length] + 12, .06); }); }
+  }
+  return {master, nodes};
+}
+function stopMusic(run){ if (!run) return; try { const a = ac(); run.master.gain.cancelScheduledValues(a.currentTime); run.master.gain.setTargetAtTime(.0001, a.currentTime, .15); run.nodes.forEach(n => { try { n.stop(a.currentTime + .5); } catch(e){} }); setTimeout(() => { try { run.master.disconnect(); } catch(e){} }, 800); } catch(e){} }
+let userMusic = null;
+
+/* ---------------- 재생 ---------------- */
+let playing = false, playStart = 0, raf = 0, musicRun = null, recording = false;
+const scrub = $("#scrub"), timeLbl = $("#timeLbl");
+function restT(){ return S.dur * .75; }
+function showTime(t){ scrub.value = t.toFixed(2); timeLbl.textContent = `${t.toFixed(1)} / ${S.dur}초`; }
+function drawStill(t = +scrub.value){ if (src.type === "video" && !playing && !recording){ const v = src.el; if (v.duration){ const tt = (t * v.playbackRate) % v.duration; if (Math.abs(v.currentTime - tt) > .05) { v.currentTime = tt; return; } } } frame(t); }
+function setScale(k){ K = k; cv.width = Math.round(FW*K); cv.height = Math.round(FH*K); }
+function loopPreview(){
+  if (!playing) return; const t = (performance.now() - playStart) / 1000;
+  if (t >= S.dur){ playStart = performance.now(); if (src.type === "video") { src.el.currentTime = 0; } stopMusic(musicRun); musicRun = startMusic([ac().destination], S.dur); }
+  const tt = Math.min(t, S.dur); frame(tt); showTime(tt); raf = requestAnimationFrame(loopPreview);
+}
+async function play(){
+  if (recording) return; if (playing) return stop();
+  await fontsReady(); playing = true; $("#playBtn").textContent = "■ 정지";
+  try { await ac().resume(); } catch(e){}
+  musicRun = startMusic([ac().destination], S.dur);
+  if (src.type === "video"){ src.el.currentTime = 0; src.el.play().catch(()=>{}); }
+  playStart = performance.now(); loopPreview();
+}
+function stop(){ playing = false; cancelAnimationFrame(raf); stopMusic(musicRun); musicRun = null; $("#playBtn").textContent = "▶ 미리보기 재생"; if (src.type === "video") src.el.pause(); }
+$("#playBtn").onclick = play;
+scrub.oninput = () => { if (playing) stop(); showTime(+scrub.value); drawStill(); };
+
+/* ---------------- 녹화 / 저장 ---------------- */
+function pickMime(){ const list = ["video/mp4;codecs=avc1.640028,mp4a.40.2","video/mp4;codecs=avc1,mp4a","video/mp4","video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"];
+  for (const m of list) if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) return m; return ""; }
+function setStatus(msg, cls){ const s = $("#status"); s.textContent = msg; s.className = "status" + (cls ? " " + cls : ""); }
+async function offerFile(blob, name){
+  try { if (window.claude && typeof window.claude.use === "function"){ const d = await window.claude.use("downloads"); if (d){ await d.save({filename: name, data: blob}); return "saved"; } } }
+  catch(e){ if (e && e.code === "declined") return "declined"; if (e && e.code === "rate_limited") return "busy"; }
+  try { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); return "link"; } catch(e){ return "fail"; }
+}
+let lastBlob = null, lastName = "";
+async function makeVideo(){
+  if (recording) return; if (!window.MediaRecorder || !cv.captureStream){ setStatus("이 브라우저는 영상 녹화를 지원하지 않아요. PC 크롬이나 엣지에서 열어 주세요.", "err"); return; }
+  stop(); await fontsReady(); recording = true; const btn = $("#makeBtn"); btn.disabled = true; $("#result").hidden = true;
+  const q = S.q; setScale(q); lineCache.clear();
+  const a = ac(); try { await a.resume(); } catch(e){}
+  const dest = a.createMediaStreamDestination();
+  const stream = cv.captureStream(30);
+  const run = startMusic([dest, a.destination], S.dur);
+  if (run) dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
+  const mime = pickMime(); let rec;
+  try { rec = new MediaRecorder(stream, mime ? {mimeType: mime, videoBitsPerSecond: q >= 1 ? 12e6 : 6e6, audioBitsPerSecond: 192000} : undefined); }
+  catch(e){ recording = false; btn.disabled = false; setScale(.5); setStatus("녹화를 시작하지 못했어요: " + e.message, "err"); return; }
+  const chunks = []; rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  const done = new Promise(r => rec.onstop = r);
+  if (src.type === "video"){ src.el.currentTime = 0; await src.el.play().catch(()=>{}); }
+  frame(0); rec.start(250); const t0 = performance.now();
+  setStatus("녹화 중… 화면을 켜 둔 채 기다려 주세요.");
+  await new Promise(res => { const tick = () => { const t = (performance.now() - t0) / 1000; frame(Math.min(t, S.dur)); showTime(Math.min(t, S.dur)); $("#barFill").style.width = clamp(t / S.dur * 100, 0, 100) + "%"; if (t >= S.dur + .15) return res(); requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
+  rec.stop(); await done; stopMusic(run); if (src.type === "video") src.el.pause();
+  recording = false; btn.disabled = false; setScale(.5); lineCache.clear(); showTime(restT()); drawStill();
+  const type = (rec.mimeType || mime || "video/webm").split(";")[0]; const ext = type.includes("mp4") ? "mp4" : "webm";
+  const blob = new Blob(chunks, {type}); const d = new Date(); const pad = n => String(n).padStart(2, "0");
+  lastBlob = blob; lastName = `글영상_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.${ext}`;
+  const box = $("#result"); box.innerHTML = ""; const v = document.createElement("video"); v.src = URL.createObjectURL(blob); v.controls = true; v.playsInline = true; box.appendChild(v);
+  const again = document.createElement("button"); again.className = "btn small"; again.type = "button"; again.textContent = "이 영상 다시 저장하기"; again.onclick = () => save(); box.appendChild(again); box.hidden = false;
+  await save(ext);
+}
+async function save(ext){
+  if (!lastBlob) return; const r = await offerFile(lastBlob, lastName);
+  const mb = (lastBlob.size / 1048576).toFixed(1);
+  if (r === "saved" || r === "link") setStatus(`완성! ${lastName} (${mb}MB)` + (lastName.endsWith("webm") ? " · 이 브라우저는 WebM으로 저장돼요. 크롬 최신판은 MP4로 저장됩니다." : ""), "ok");
+  else if (r === "declined") setStatus("저장을 취소했어요. 아래 '다시 저장하기'로 언제든 받을 수 있어요.");
+  else setStatus("자동 저장이 막혔어요. 아래 영상을 길게 누르거나 ⋮ 메뉴에서 저장해 주세요.", "err");
+}
+$("#makeBtn").onclick = makeVideo;
+
+/* ---------------- AI 생성 (Gemini API) ---------------- */
+const API = "https://generativelanguage.googleapis.com/v1beta";
+let aiImage = null; // {b64, mime}
+function aiMsg(m, cls){ const s = $("#aiStatus"); s.textContent = m; s.className = "status" + (cls ? " " + cls : ""); }
+function apiKey(){ const k = $("#apiKey").value.trim(); if (!k) { aiMsg("Gemini API 키를 먼저 넣어 주세요.", "err"); return null; } return k; }
+function netErr(e){ return (e instanceof TypeError) ? "외부 연결이 막혀 있어요. Claude 미리보기 화면에서는 AI 호출이 차단됩니다. GitHub/Netlify에 올린 버전에서 쓰거나, 프롬프트를 복사해 Gemini 앱에서 만든 뒤 '내 사진·영상'으로 올려 주세요." : (e.message || String(e)); }
+function imgAspect(){ return {"9:16":"9:16","4:5":"3:4","1:1":"1:1","16:9":"16:9"}[S.ratio]; }
+function vidAspect(){ return S.ratio === "16:9" ? "16:9" : "9:16"; }
+async function genImage(){
+  const key = apiKey(); if (!key) return; const b = $("#genImg"); b.disabled = true; aiMsg("AI가 사진을 그리는 중… (10~20초)");
+  try {
+    const r = await fetch(`${API}/models/${encodeURIComponent($("#imgModel").value.trim())}:predict`, {method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key},
+      body: JSON.stringify({instances:[{prompt: $("#imgPrompt").value}], parameters:{sampleCount:1, aspectRatio: imgAspect()}})});
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error((j.error && j.error.message) || ("오류 " + r.status));
+    const p = j.predictions && j.predictions[0]; if (!p || !p.bytesBase64Encoded) throw new Error("사진이 만들어지지 않았어요. 프롬프트를 조금 바꿔 다시 시도해 주세요.");
+    aiImage = {b64: p.bytesBase64Encoded, mime: p.mimeType || "image/png"};
+    await useImageUrl(`data:${aiImage.mime};base64,${aiImage.b64}`); aiMsg("AI 사진 완성! 더 생생하게 하려면 '사진→움직이는 영상'을 눌러 보세요.", "ok");
+  } catch(e){ aiMsg(netErr(e), "err"); } finally { b.disabled = false; }
+}
+async function genVideo(){
+  const key = apiKey(); if (!key) return; const b = $("#genVid"); b.disabled = true;
+  try {
+    if (!aiImage){ aiMsg("먼저 AI 사진을 만들고 있어요…"); b.disabled = false; await genImage(); b.disabled = true; if (!aiImage) return; }
+    aiMsg("Veo가 사진을 움직이는 영상으로 만드는 중… (1~3분, 창을 닫지 마세요)");
+    const prompt = $("#imgPrompt").value + "\n\nMotion: " + $("#vidPrompt").value;
+    const r = await fetch(`${API}/models/${encodeURIComponent($("#vidModel").value.trim())}:predictLongRunning`, {method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key},
+      body: JSON.stringify({instances:[{prompt, image:{bytesBase64Encoded: aiImage.b64, mimeType: aiImage.mime}}], parameters:{aspectRatio: vidAspect(), negativePrompt:"text, subtitles, watermark, logo, distorted faces, fast camera movement"}})});
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error((j.error && j.error.message) || ("오류 " + r.status));
+    let op = j; const t0 = Date.now();
+    while (!op.done){ if (Date.now() - t0 > 6*60e3) throw new Error("6분이 지나도 완성되지 않았어요. 잠시 후 다시 시도해 주세요.");
+      await new Promise(r => setTimeout(r, 8000)); aiMsg(`Veo 영상 생성 중… ${Math.round((Date.now()-t0)/1000)}초 경과`);
+      const pr = await fetch(`${API}/${op.name}`, {headers:{"x-goog-api-key":key}}); op = await pr.json(); if (op.error) throw new Error(op.error.message); }
+    if (op.error) throw new Error(op.error.message);
+    const resp = op.response || {}; const sample = (resp.generateVideoResponse && resp.generateVideoResponse.generatedSamples || resp.generatedVideos || [])[0];
+    const uri = sample && sample.video && (sample.video.uri || sample.video.url);
+    if (!uri) throw new Error("영상 결과를 찾지 못했어요. (안전 필터에 걸렸을 수 있어요) 프롬프트를 바꿔 다시 시도해 주세요.");
+    aiMsg("영상을 내려받는 중…");
+    let vr; try { vr = await fetch(uri, {headers:{"x-goog-api-key":key}}); if (!vr.ok) throw 0; } catch(e){ vr = await fetch(uri + (uri.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(key)); }
+    if (!vr.ok) throw new Error("영상 내려받기 실패 (" + vr.status + ")");
+    const blob = await vr.blob(); await useVideoBlob(blob); aiMsg("AI 영상 배경 완성! 미리보기를 재생해 보세요.", "ok");
+  } catch(e){ aiMsg(netErr(e), "err"); } finally { b.disabled = false; }
+}
+$("#genImg").onclick = genImage; $("#genVid").onclick = genVideo;
+try { const k = localStorage.getItem("gyv-key"); if (k) { $("#apiKey").value = k; $("#rememberKey").checked = true; } } catch(e){}
+function keyPersist(){ try { if ($("#rememberKey").checked) localStorage.setItem("gyv-key", $("#apiKey").value.trim()); else localStorage.removeItem("gyv-key"); } catch(e){} }
+$("#rememberKey").onchange = keyPersist; $("#apiKey").onchange = keyPersist;
+
+/* ---------------- 배경 불러오기 ---------------- */
+function useImageUrl(url){ return new Promise((res, rej) => { const im = new Image(); im.onload = () => { src = {type:"image", el: im, w: im.naturalWidth, h: im.naturalHeight}; buildBase(); refresh(); res(); }; im.onerror = () => rej(new Error("사진을 열 수 없어요.")); im.src = url; }); }
+function useVideoBlob(blob){ return new Promise((res, rej) => { const v = document.createElement("video"); v.muted = true; v.loop = true; v.playsInline = true; v.preload = "auto"; v.src = URL.createObjectURL(blob);
+  v.onloadeddata = () => { src = {type:"video", el: v, w: v.videoWidth, h: v.videoHeight}; v.playbackRate = v.duration && v.duration < S.dur ? clamp(v.duration / S.dur, .5, 1) : 1; base = null; sampleInk(); refresh(); res(); };
+  v.onseeked = () => { if (!playing && !recording) frame(+scrub.value); };
+  v.onerror = () => rej(new Error("영상을 열 수 없어요. mp4 파일을 써 주세요.")); }); }
+$("#bgFile").onchange = async e => { const f = e.target.files[0]; if (!f) return; stop();
+  try { if (f.type.startsWith("video")) await useVideoBlob(f); else await useImageUrl(URL.createObjectURL(f)); setStatus("배경을 불러왔어요.", "ok"); } catch(err){ setStatus(err.message, "err"); } };
+$("#musicFile").onchange = async e => { const f = e.target.files[0]; if (!f) return; try { userMusic = await ac().decodeAudioData(await f.arrayBuffer()); setStatus("내 음악을 넣었어요. 영상 길이에 맞춰 앞부분이 쓰이고 끝은 서서히 줄어듭니다.", "ok"); } catch(err){ setStatus("음악 파일을 읽지 못했어요.", "err"); } };
+
+/* ---------------- 프롬프트 ---------------- */
+function buildPrompts(){ const sc = sceneOf(S.scene);
+  const ar = {"9:16":"vertical 9:16","4:5":"vertical 4:5","1:1":"square 1:1","16:9":"horizontal 16:9"}[S.ratio];
+  $("#imgPrompt").value = `${sc.img} ${sc.people ? KOREAN + " " : ""}${COMMON} Aspect ratio ${ar}.`;
+  $("#vidPrompt").value = `${sc.mo}. ${sc.people ? "Keep everyone Korean and natural. " : ""}${MOTION_SUFFIX}`;
+  $("#sceneDesc").textContent = sc.d + " · 음악: " + MUSIC[sc.mood];
+}
+async function copyText(el, btn){ try { await navigator.clipboard.writeText(el.value); const o = btn.textContent; btn.textContent = "복사됨 ✓"; setTimeout(() => btn.textContent = o, 1400); } catch(e){ el.focus(); el.select(); btn.textContent = "선택됨 · 길게 눌러 복사"; } }
+$("#copyImg").onclick = e => copyText($("#imgPrompt"), e.currentTarget); $("#copyVid").onclick = e => copyText($("#vidPrompt"), e.currentTarget);
+
+/* ---------------- 줄나눔 · 장면 추천 ---------------- */
+function autoBreak(text){ const words = text.replace(/\s*\n\s*/g, " ").trim().split(/\s+/).filter(Boolean); const total = words.join(" ").length; if (!total) return text;
+  const n = Math.max(1, Math.round(total / 14)); const target = total / n; const lines = []; let cur = "";
+  words.forEach(w => { const t = cur ? cur + " " + w : w; if (cur && t.length > target * 1.2) { lines.push(cur); cur = w; } else cur = t; if (/[,.!?…]$/.test(cur) && cur.length > target * .6) { lines.push(cur); cur = ""; } });
+  if (cur) lines.push(cur); return lines.join("\n"); }
+const HINTS = [["beach",/바다|파도|노을|해변|산책|함께/],["whale",/고래|칭찬|아첨/],["summit",/정상|능력|인격|산|오르/],["pinwheel",/바람|달려|앞으로|희망/],["flower",/꽃|작은|피어|봄/],["lake",/여행|탐험|풍경|눈으로|새로운/],["ginkgo",/가을|세월|추억|낙엽|기다/],["hanok",/어머니|엄마|고향|할머니|비|그리움/],["city",/흔들|독해|약속|도시|밤/],["hill",/변화|서로|사람들|함께|관계/],["pier",/듣|대화|이해|말/],["field",/쉼|충전|지치|배터리|슬럼프|천천히/]];
+function suggestScene(){ const t = S.text + " " + S.source; let best = null, sc = 0; HINTS.forEach(([id, re]) => { const m = (t.match(new RegExp(re.source, "g")) || []).length; if (m > sc) { sc = m; best = id; } });
+  if (!best) best = SCENES[(S.text.length * 7) % SCENES.length].id; selectScene(best); setStatus(`'${sceneOf(best).n}' 장면을 추천했어요.`, "ok"); }
+
+/* ---------------- UI 구성 ---------------- */
+function segment(el, items, key, onChange){ el.innerHTML = ""; items.forEach(([v, label]) => { const b = document.createElement("button"); b.type = "button"; b.dataset.v = v; b.textContent = label; el.appendChild(b); }); bindSeg(el, key, onChange); }
+function bindSeg(el, key, onChange){ const sync = () => el.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(String(S[key]) === b.dataset.v)));
+  el.onclick = e => { const b = e.target.closest("button"); if (!b) return; const v = b.dataset.v; S[key] = (typeof S[key] === "number") ? +v : v; sync(); onChange && onChange(); persist(); }; sync(); }
+segment($("#animSeg"), ANIMS, "anim", () => refresh(true));
+segment($("#motionSeg"), MOTIONS, "motion", () => refresh());
+segment($("#gradeSeg"), GRADES, "grade", () => { buildBase(); refresh(); });
+segment($("#ratioSeg"), Object.keys(RATIOS).map(r => [r, {"9:16":"세로 9:16","4:5":"세로 4:5","1:1":"정사각 1:1","16:9":"가로 16:9"}[r]]), "ratio", () => { applyRatio(); buildPrompts(); });
+segment($("#durSeg"), [["10","10초"],["15","15초"],["20","20초"]], "dur", () => { scrub.max = S.dur; showTime(restT()); if (src.type === "video" && src.el.duration) src.el.playbackRate = src.el.duration < S.dur ? clamp(src.el.duration / S.dur, .5, 1) : 1; refresh(true); });
+bindSeg($("#inkSeg"), "ink", () => { lineCache.clear(); refresh(); });
+bindSeg($("#posSeg"), "pos", () => { sampleInk(); refresh(); });
+bindSeg($("#qSeg"), "q");
+bindSeg($("#bgTabs"), "bg", () => showBgTab(true));
+function showBgTab(user){ ["ai","upload","scene"].forEach(k => $("#tab-" + k).hidden = S.bg !== k); if (user && S.bg === "scene"){ stop(); src = {type:"scene"}; buildBase(); refresh(); } }
+
+const sel = $("#music"); Object.entries(MUSIC).forEach(([k, v]) => { const o = document.createElement("option"); o.value = k; o.textContent = v; sel.appendChild(o); });
+sel.value = S.music; sel.onchange = () => { S.music = sel.value; userMusic = null; $("#musicFile").value = ""; persist(); if (playing){ stop(); play(); } };
+const sm = $("#sample"); [["", "— 고전 명언 예시 고르기 —"], ...SAMPLES.map((s, i) => [i, `${s.t.replace(/\n/g, " ")} · ${s.a || s.s}`])].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; sm.appendChild(o); });
+sm.onchange = () => { if (sm.value === "") return; const s = SAMPLES[+sm.value]; S.text = s.t; S.author = s.a; S.source = s.s; syncInputs(); refresh(true); persist(); };
+
+function syncInputs(){ $("#text").value = S.text; $("#author").value = S.author; $("#source").value = S.source; $("#brand").value = S.brand; }
+[["text","text"],["author","author"],["source","source"],["brand","brand"]].forEach(([id, k]) => $("#" + id).addEventListener("input", e => { S[k] = e.target.value; persist(); fontsReady().then(() => refresh()); }));
+$("#autoBreak").onclick = () => { S.text = autoBreak(S.text); syncInputs(); refresh(true); persist(); };
+$("#suggest").onclick = suggestScene;
+
+const sliders = [["size",v=>Math.round(v*100)+"%"],["asize",v=>Math.round(v*100)+"%"],["lh",v=>Math.round(v*100)+"%"],["haze",v=>Math.round(v*100)+"%"],["grain",v=>Math.round(v*100)+"%"],["vol",v=>Math.round(v*100)+"%"],["focusY",v=>Math.round(v*100)+"%"]];
+sliders.forEach(([k, fmt]) => { const el = $("#" + k), out = $("#" + k + "o"); el.value = S[k]; out.textContent = fmt(S[k]);
+  el.oninput = () => { S[k] = +el.value; out.textContent = fmt(S[k]); if (k === "size" || k === "asize" || k === "lh") lineCache.clear(); if (k !== "vol") refresh(); persist(); }; });
+$("#fadeOut").checked = S.fadeOut; $("#fadeOut").onchange = e => { S.fadeOut = e.target.checked; refresh(); persist(); };
+
+// 글씨체 칩
+const fontsEl = $("#fonts");
+FONTS.forEach(F => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.dataset.v = F.f;
+  b.innerHTML = `<span class="s"></span><span class="n"></span>`; b.querySelector(".s").textContent = "한 걸음씩"; b.querySelector(".s").style.fontFamily = `"${F.f}", serif`; b.querySelector(".n").textContent = F.n; fontsEl.appendChild(b); });
+function syncFonts(){ fontsEl.querySelectorAll(".chip").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === S.font))); }
+fontsEl.onclick = e => { const b = e.target.closest(".chip"); if (!b) return; S.font = b.dataset.v; syncFonts(); lineCache.clear(); persist(); fontsReady().then(() => refresh(true)); };
+
+// 장면 카드
+const scenesEl = $("#scenes");
+SCENES.forEach(sc => { const b = document.createElement("button"); b.type = "button"; b.className = "scene"; b.dataset.v = sc.id;
+  const c = document.createElement("canvas"); c.width = 90; c.height = 160; b.appendChild(c); const sp = document.createElement("span"); sp.textContent = sc.n + (sc.people ? "" : " ·풍경"); b.appendChild(sp); scenesEl.appendChild(b); });
+function drawThumbs(){ scenesEl.querySelectorAll(".scene").forEach((b, i) => { const c = b.querySelector("canvas"); const g = c.getContext("2d"); const sc = SCENES[i];
+  g.drawImage(genScene(sc, 90, 160), 0, 0); if (FILTER_OK){ const t = document.createElement("canvas"); t.width=90; t.height=160; const tg = t.getContext("2d"); tg.filter = GRADE_FILTER[sc.grade]; tg.drawImage(c,0,0); g.clearRect(0,0,90,160); g.drawImage(t,0,0); } }); }
+function syncScenes(){ scenesEl.querySelectorAll(".scene").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === S.scene))); }
+function selectScene(id){ S.scene = id; syncScenes(); buildPrompts(); aiImage = null; if (src.type === "scene") buildBase(); else if (S.grade === "scene") buildBase(); refresh(); persist(); if (playing){ stop(); play(); } }
+scenesEl.onclick = e => { const b = e.target.closest(".scene"); if (!b) return; selectScene(b.dataset.v); };
+
+/* ---------------- 공통 ---------------- */
+async function fontsReady(){ const F = fontOf(S.font); try { await Promise.all([document.fonts.load(`60px "${F.f}"`, S.text || "가"), document.fonts.load(`40px "${AUTHOR_FONT}"`, authorLine() + S.brand + "가")]); } catch(e){} }
+function applyRatio(){ const [w, h] = RATIOS[S.ratio]; FW = w; FH = h; stop(); setScale(.5); layoutKey = ""; lineCache.clear(); buildBase(); refresh(); }
+let rT = 0;
+function refresh(resetTime){ layoutKey = ""; if (resetTime && !playing) showTime(restT()); cancelAnimationFrame(rT); rT = requestAnimationFrame(() => { if (!playing && !recording) drawStill(); }); }
+if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", () => { lineCache.clear(); layoutKey = ""; refresh(); });
+
+// 시작
+syncInputs(); syncFonts(); syncScenes(); sel.value = S.music; scrub.max = S.dur; showBgTab(false);
+const [w0, h0] = RATIOS[S.ratio]; FW = w0; FH = h0; setScale(.5); buildPrompts(); buildBase(); showTime(restT());
+fontsReady().then(() => { lineCache.clear(); layoutKey = ""; sampleInk(); refresh(); });
+frame(restT());
+setTimeout(drawThumbs, 30);
+})();
+</script>
+
+</body></html>
