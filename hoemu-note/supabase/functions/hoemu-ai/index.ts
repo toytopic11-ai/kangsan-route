@@ -431,6 +431,63 @@ numbers 최대 6개(금액·인원·비율 등 핵심 숫자), issues 최대 4�
         });
       }
 
+      // ④-4 전년 대비 비교표: 두 자료(쪽)의 같은 항목 숫자를 맞춰 JSON 으로(증감 계산은 앱에서)
+      case "compare_table": {
+        const aId = String(body.a_id ?? "");
+        const bId = String(body.b_id ?? "");
+        const ref = `${bId}:${body.a_page ?? ""}:${body.b_page ?? ""}`;
+        if (aId && !body.refresh) {
+          const { data: hit } = await sb
+            .from("ai_outputs")
+            .select("content, created_at")
+            .eq("document_id", aId)
+            .eq("kind", "compare_table")
+            .eq("ref", ref)
+            .maybeSingle();
+          if (hit) return json({ table: hit.content, cached: true, cost_usd: 0 });
+        }
+        const r = await callClaude(
+          sb,
+          user.id,
+          "compare_table",
+          "claude-haiku-5-5",
+          `두 자료(A=이전, B=이후)에서 같은 항목의 숫자를 짝지어 비교표를 만든다. JSON 객체만 출력:
+{"title":"비교표 제목","unit":"천원 등","a_label":"A 시기 이름(예: 2025년)","b_label":"B 시기 이름(예: 2026년)","rows":[{"item":"항목","a":숫자|null,"b":숫자|null,"reason":"증감 이유(자료에 근거가 있을 때만, 없으면 빈 문자열)"}],"highlights":["핵심 변화 1","핵심 변화 2","핵심 변화 3"]}
+규칙: 숫자는 쉼표 없는 숫자(△·괄호는 음수). 한쪽에만 있는 항목은 다른 쪽을 null(신설·폐지). 합계·소계 행은 제외.
+행은 최대 25개. 이유를 지어내지 않는다. 증감 계산은 하지 않는다.`,
+          `<A 문서="${String(body.a_title ?? "A")}">\n${String(body.a_text ?? "").slice(0, 12000)}\n</A>\n\n<B 문서="${String(body.b_title ?? "B")}">\n${String(body.b_text ?? "").slice(0, 12000)}\n</B>`,
+          4000,
+        );
+        const t = parseJson(r.text, null as null | Record<string, unknown>);
+        if (!t || !Array.isArray(t.rows) || !t.rows.length)
+          return json(
+            {
+              error:
+                "비교할 숫자 항목을 찾지 못했습니다. 두 자료의 같은 표가 있는 쪽을 펴고 다시 해 주세요.",
+            },
+            422,
+          );
+        if (aId)
+          await sb
+            .from("ai_outputs")
+            .upsert(
+              {
+                user_id: user.id,
+                document_id: aId,
+                kind: "compare_table",
+                ref,
+                content: t,
+                cost_usd: r.cost,
+              },
+              { onConflict: "user_id,document_id,kind,ref" },
+            )
+            .then(
+              () => undefined,
+              () => undefined,
+            );
+        return json({ table: t, cached: false, cost_usd: r.cost });
+      }
+
       // ⑤ 규정 조문 분해 → JSON
       case "split_articles": {
         const r = await callClaude(
