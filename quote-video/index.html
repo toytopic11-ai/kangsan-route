@@ -169,7 +169,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
           <details>
             <summary>고급: 모델 이름 직접 지정</summary>
             <div class="row" style="margin-top:8px">
-              <label class="f">사진 모델 <input type="text" id="imgModel" placeholder="비우면 자동 (imagen-4.0…)"></label>
+              <label class="f">사진 모델 <input type="text" id="imgModel" placeholder="비우면 자동 (gemini-3.1-flash-image…)"></label>
               <label class="f">영상 모델 <input type="text" id="vidModel" placeholder="비우면 자동 (veo-3.1…)"></label>
             </div>
             <p class="hint" style="margin-top:6px">비워 두면 최신 모델부터 차례로 시도합니다. 키 발급: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a></p>
@@ -302,7 +302,7 @@ const COMMON = "STYLE LOCK, match this exact look: a quiet Korean 'good words' q
 const MOTION_SUFFIX = "Locked-off tripod camera: no pan, no zoom, no cuts. Calm, slow, realistic motion only.";
 const VEO_LOCK = "Animate this exact photograph as one continuous 8-second shot. Keep the composition, framing, colors, lighting, location and every person exactly as in the image; nobody turns toward the camera and faces stay hidden; no new people or objects appear. Only subtle natural motion: ";
 const VEO_NEG = "text, letters, subtitles, captions, watermark, logo, camera pan, zoom, camera shake, cuts, scene change, new people appearing, people turning to the camera, close-up faces, saturated colors, cartoon, CGI look, distorted bodies, fast motion";
-const IMG_MODELS = ["imagen-4.0-generate-001","imagen-4.0-fast-generate-001","imagen-3.0-generate-002"];
+const IMG_MODELS = ["gemini-3.1-flash-image","gemini-3-pro-image","gemini-2.5-flash-image","imagen-4.0-generate-001"];
 const VID_MODELS = {fast:["veo-3.1-fast-generate-preview","veo-3.1-fast-generate-001","veo-3.0-fast-generate-001"], best:["veo-3.1-generate-preview","veo-3.1-generate-001","veo-3.0-generate-001"]};
 
 const SCENES = [
@@ -863,20 +863,40 @@ async function callModels(list, method, body, key){
     if (r.status === 404 || /not found|not supported|is not available/i.test(msg)) { last = new Error(msg); continue; }
     throw new Error(msg);
   }
-  throw last || new Error("사용 가능한 모델을 찾지 못했어요.");
+  throw new Error(`이 API 키로 쓸 수 있는 모델이 없어요 (${list.join(", ")}). Google AI Studio에서 해당 모델이 열려 있는지 확인하거나, '고급: 모델 이름'에 사용 가능한 모델을 넣어 주세요.`);
 }
 function pickCandidate(i, list){ aiImage = list[i]; $("#cands").querySelectorAll("button").forEach((b, k) => b.setAttribute("aria-pressed", String(k === i)));
   return useImageUrl(`data:${aiImage.mime};base64,${aiImage.b64}`); }
+// 사진 1장 생성: Nano Banana(generateContent) 또는 Imagen(predict)
+async function imageOnce(model, key, prompt){
+  if (model.startsWith("imagen")){
+    const r = await fetch(`${API}/models/${encodeURIComponent(model)}:predict`, {method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key}, body: JSON.stringify({instances:[{prompt}], parameters:{sampleCount:1, aspectRatio: imgAspect()}})});
+    const j = await r.json().catch(() => ({})); if (!r.ok) { const e = new Error((j.error && j.error.message) || ("오류 " + r.status)); e.status = r.status; throw e; }
+    const p = (j.predictions || [])[0]; if (!p || !p.bytesBase64Encoded) throw new Error("사진이 만들어지지 않았어요."); return {b64: p.bytesBase64Encoded, mime: p.mimeType || "image/png"};
+  }
+  const r = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key},
+    body: JSON.stringify({contents:[{role:"user", parts:[{text: prompt}]}], generationConfig:{responseModalities:["IMAGE"], imageConfig:{aspectRatio: imgAspect()}}})});
+  const j = await r.json().catch(() => ({})); if (!r.ok) { const e = new Error((j.error && j.error.message) || ("오류 " + r.status)); e.status = r.status; throw e; }
+  const parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
+  const im = parts.find(x => x.inlineData || x.inline_data); const d = im && (im.inlineData || im.inline_data);
+  if (!d) throw new Error("사진이 만들어지지 않았어요. (안전 필터일 수 있어요) 프롬프트를 조금 바꿔 다시 시도해 주세요.");
+  return {b64: d.data, mime: d.mimeType || d.mime_type || "image/png"};
+}
 async function genImage(){
-  const key = apiKey(); if (!key) return; const b = $("#genImg"); b.disabled = true; aiMsg("AI가 후보 사진 4장을 그리는 중… (15~30초)");
+  const key = apiKey(); if (!key) return; const b = $("#genImg"); b.disabled = true; aiMsg("AI가 후보 사진 4장을 그리는 중… (20~40초)");
   try {
-    const {j, model} = await callModels(modelList("#imgModel", IMG_MODELS), "predict", {instances:[{prompt: $("#imgPrompt").value}], parameters:{sampleCount:4, aspectRatio: imgAspect()}}, key);
-    const list = (j.predictions || []).filter(p => p.bytesBase64Encoded).map(p => ({b64: p.bytesBase64Encoded, mime: p.mimeType || "image/png"}));
-    if (!list.length) throw new Error("사진이 만들어지지 않았어요. (안전 필터일 수 있어요) 프롬프트를 조금 바꿔 다시 시도해 주세요.");
+    const prompt = $("#imgPrompt").value; let list = [], used = "", last = null;
+    for (const m of modelList("#imgModel", IMG_MODELS)){
+      try { const first = await imageOnce(m, key, prompt); used = m;
+        const rest = await Promise.allSettled([1,2,3].map(() => imageOnce(m, key, prompt)));
+        list = [first, ...rest.filter(x => x.status === "fulfilled").map(x => x.value)]; break;
+      } catch(e){ last = e; if (e.status === 404 || /not found|not supported|is not available/i.test(e.message)) continue; throw e; }
+    }
+    if (!list.length) throw last || new Error("사용 가능한 사진 모델을 찾지 못했어요.");
     const box = $("#cands"); box.innerHTML = ""; box.hidden = false;
     list.forEach((c, i) => { const bt = document.createElement("button"); bt.type = "button"; bt.setAttribute("aria-label", `후보 ${i+1}`); const im = document.createElement("img"); im.src = `data:${c.mime};base64,${c.b64}`; im.alt = ""; bt.appendChild(im); bt.onclick = () => pickCandidate(i, list); box.appendChild(bt); });
     await pickCandidate(0, list);
-    aiMsg(`후보 ${list.length}장 완성 (${model}). 레퍼런스와 가장 닮은 사진을 눌러 고른 뒤 ②를 누르세요.`, "ok");
+    aiMsg(`후보 ${list.length}장 완성 (${used}). 레퍼런스와 가장 닮은 사진을 눌러 고른 뒤 ②를 누르세요.`, "ok");
   } catch(e){ aiMsg(netErr(e), "err"); } finally { b.disabled = false; }
 }
 async function genVideo(){
