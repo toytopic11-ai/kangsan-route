@@ -120,6 +120,7 @@ async function callClaude(
   system: string,
   content: Anthropic.MessageParam["content"],
   maxTokens = 2000,
+  effort: "low" | "medium" | "high" = "low",
 ) {
   // 월 상한 확인
   const [{ data: spent }, { data: setting }] = await Promise.all([
@@ -138,7 +139,7 @@ async function callClaude(
     max_tokens: maxTokens,
     system,
     messages: [{ role: "user", content }],
-    output_config: { effort: "low" },
+    output_config: { effort },
   });
 
   const [pi, po] = PRICE[model] ?? PRICE["claude-haiku-5-5"];
@@ -200,6 +201,198 @@ async function findPages(
   return (data ?? []) as Page[];
 }
 
+// ───────── 질문 답변용 자료 모으기(선택 범위 우선, 넉넉하게) ─────────
+const ASK_BUDGET = 60000; // AI 에게 보여 줄 본문 글자 수 상한(약 4만 토큰)
+const ASK_PAGE_CHARS = 6000;
+// 질문 끝말(…인가요, …했나, …해줘) 떼기
+const ENDINGS =
+  /(인가요|입니까|습니까|었나요|했나요|나요|가요|는지|은지|인지|었나|했나|했니|할까|이야|예요|이에요|에요|하나|해요|해줘|줘|야|요|니|냐|지)$/;
+const STOP2 = new Set([
+  ...STOP,
+  "뭐",
+  "뭐야",
+  "무엇인가",
+  "어디",
+  "누구",
+  "왜",
+  "얼마",
+  "얼마나",
+  "있나",
+  "있어",
+  "없나",
+  "설명",
+  "대해",
+  "대해서",
+  "경우",
+  "이번",
+  "지금",
+  "우리",
+  "알려주세요",
+  "해주세요",
+  "궁금",
+]);
+
+/** 검색어와 가중치: 원래 단어(3) + 긴 한글 합성어의 2글자 조각(1) */
+function askKeywords(q: string): [string, number][] {
+  const out = new Map<string, number>();
+  const add = (k: string, w: number) => {
+    if (k.length >= 2 && !STOP2.has(k)) out.set(k, Math.max(out.get(k) ?? 0, w));
+  };
+  for (const raw of q.replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/)) {
+    let w = raw.trim();
+    for (let i = 0; i < 2; i++) {
+      if (w.length > 2) w = w.replace(ENDINGS, "");
+      if (w.length > 2) w = w.replace(JOSA, "");
+    }
+    add(w, 3);
+    if (/^[가-힣]{4,}$/.test(w)) for (let i = 0; i + 2 <= w.length; i++) add(w.slice(i, i + 2), 1);
+  }
+  return [...out.entries()].slice(0, 16);
+}
+
+function scorePage(p: Page, kws: [string, number][]) {
+  let s = 0;
+  for (const [k, w] of kws) {
+    let n = 0;
+    let i = p.content.indexOf(k);
+    while (i >= 0 && n < 6) {
+      n++;
+      i = p.content.indexOf(k, i + k.length);
+    }
+    s += n * w;
+    if (p.title.includes(k)) s += w * 2;
+  }
+  return s;
+}
+
+/** AI 로 검색어 넓히기(동의어·공식 용어) — 아주 적은 비용 */
+async function expandKeywords(sb: SupabaseClient, userId: string, q: string) {
+  try {
+    const r = await callClaude(
+      sb,
+      userId,
+      "ask_keywords",
+      "claude-haiku-5-5",
+      "질문의 답을 협회 자료(정관·규정·예산서·회의록·공문)에서 찾기 위한 검색어를 JSON 문자열 배열로만 출력한다. 8개 이내, 2~6글자 명사 위주, 동의어·공식 용어 포함(예: 회비 → 회비, 연회비, 입회비, 회비규정).",
+      q,
+      200,
+    );
+    return parseJson(r.text, [] as unknown[])
+      .map(String)
+      .filter((k) => k.length >= 2)
+      .slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
+type AskScope = {
+  org?: string | null;
+  categoryIds?: string[] | null;
+  documentIds?: string[] | null;
+};
+
+async function gatherForAsk(sb: SupabaseClient, userId: string, q: string, scope: AskScope) {
+  let kws = askKeywords(q);
+  const scoped = !!(scope.documentIds?.length || scope.categoryIds?.length);
+  let dq = sb
+    .from("documents")
+    .select("id, title")
+    .order("updated_at", { ascending: false })
+    .limit(500);
+  if (scope.documentIds?.length) dq = dq.in("id", scope.documentIds);
+  else if (scope.categoryIds?.length) dq = dq.in("category_id", scope.categoryIds);
+  else if (scope.org) dq = dq.eq("org", scope.org);
+  const { data: docs } = await dq;
+  const titleOf = new Map(
+    ((docs ?? []) as { id: string; title: string }[]).map((d) => [d.id, d.title]),
+  );
+  if (!titleOf.size) return { pages: [] as Page[], read: 0, docs: 0, mode: "none" as const };
+
+  let rows: Page[] = [];
+  if (scoped && titleOf.size <= 40) {
+    // 고른 범위가 좁으면 그 자료의 모든 쪽을 직접 살핌(단어가 달라도 놓치지 않음)
+    const { data } = await sb
+      .from("doc_pages")
+      .select("document_id, page_no, content")
+      .in("document_id", [...titleOf.keys()])
+      .order("page_no")
+      .limit(1500);
+    rows = ((data ?? []) as Omit<Page, "title">[]).map((r) => ({
+      ...r,
+      title: titleOf.get(r.document_id) ?? "",
+    }));
+  } else {
+    const search = async (words: string[]) => {
+      const { data } = await sb.rpc("match_pages", {
+        keywords: words.slice(0, 16),
+        p_org: scope.org ?? null,
+        p_category_ids: scope.categoryIds?.length ? scope.categoryIds : null,
+        p_limit: 60,
+      });
+      return (data ?? []) as Page[];
+    };
+    rows = await search(kws.map(([k]) => k));
+    if (rows.length < 5) {
+      // 찾은 쪽이 적으면 AI 로 검색어를 넓혀 한 번 더
+      const more = await expandKeywords(sb, userId, q);
+      if (more.length) {
+        kws = [...kws, ...more.map((k): [string, number] => [k, 2])];
+        const seen = new Set(rows.map((r) => `${r.document_id}:${r.page_no}`));
+        for (const r of await search(more))
+          if (!seen.has(`${r.document_id}:${r.page_no}`)) rows.push(r);
+      }
+    }
+  }
+  rows = rows.filter((r) => r.content?.trim());
+  const docCount = new Set(rows.map((r) => r.document_id)).size;
+  const total = rows.reduce((n, r) => n + Math.min(r.content.length, ASK_PAGE_CHARS), 0);
+  if (total <= ASK_BUDGET)
+    return { pages: rows, read: rows.length, docs: docCount, mode: "all" as const };
+
+  // 많으면: 관련도 순으로 고르고, 상위 쪽의 앞뒤 쪽도 함께(문맥 이어짐)
+  const scored = rows.map((p) => ({ p, s: scorePage(p, kws) })).sort((a, b) => b.s - a.s);
+  const key = (p: Page) => `${p.document_id}:${p.page_no}`;
+  const byKey = new Map(rows.map((p) => [key(p), p]));
+  const picked: Page[] = [];
+  const used = new Set<string>();
+  let budget = ASK_BUDGET;
+  const take = (p: Page | undefined) => {
+    if (!p || used.has(key(p))) return;
+    const len = Math.min(p.content.length, ASK_PAGE_CHARS);
+    if (len > budget) return;
+    used.add(key(p));
+    picked.push(p);
+    budget -= len;
+  };
+  const top = scored[0]?.s ? scored.filter((x) => x.s > 0) : scored; // 하나도 안 맞으면 앞쪽부터
+  top.forEach((x, i) => {
+    take(x.p);
+    if (i < 3) {
+      take(byKey.get(`${x.p.document_id}:${x.p.page_no - 1}`));
+      take(byKey.get(`${x.p.document_id}:${x.p.page_no + 1}`));
+    }
+  });
+  return { pages: picked, read: rows.length, docs: docCount, mode: "ranked" as const };
+}
+
+const askBlock = (pages: Page[]) =>
+  pages
+    .map(
+      (p) =>
+        `<자료 문서="${p.title}" 페이지="${p.page_no}">\n${p.content.slice(0, ASK_PAGE_CHARS)}\n</자료>`,
+    )
+    .join("\n\n");
+
+const ASK_RULES = `
+답변 방법:
+- 첫 줄에 질문에 대한 결론을 1~2문장으로 쓴다.
+- 이어서 근거를 개조식으로 쓴다. 조항·숫자·문장을 구체적으로 인용하고 끝에 [문서명 p.N] 을 붙인다.
+- 질문과 똑같은 표현이 없어도 뜻이 같은 내용(다른 용어·조항·표)을 최대한 찾아 답한다.
+- 직접 규정이 없으면 "직접 규정은 없으나 관련 내용은 다음과 같음"으로 구분해 관련 내용을 정리한다.
+- 여러 자료에 걸쳐 있으면 모두 모아 종합·비교한다. 계산이 필요하면 계산 과정을 보인다.
+- 정말 자료에 전혀 없을 때만 "자료에서 확인되지 않음"이라고 쓰고, 어떤 자료를 올리면 답할 수 있는지 한 줄로 제안한다.`;
+
 const sources = (pages: Page[]) =>
   pages.map((p) => ({ document_id: p.document_id, title: p.title, page_no: p.page_no }));
 
@@ -232,22 +425,60 @@ Deno.serve(async (req) => {
       case "ask": {
         const q = String(body.question ?? "").slice(0, 2000);
         if (!q) return json({ error: "질문이 비어 있습니다" }, 400);
-        const pages = await findPages(sb, q, body.org, body.category_ids);
-        if (!pages.length)
+        const ids = (v: unknown) =>
+          Array.isArray(v)
+            ? v
+                .map(String)
+                .filter((x) => /^[0-9a-f-]{36}$/i.test(x))
+                .slice(0, 300)
+            : [];
+        const found = await gatherForAsk(sb, user.id, q, {
+          org: body.org ?? null,
+          categoryIds: ids(body.category_ids),
+          documentIds: ids(body.document_ids),
+        });
+        const scope = {
+          docs: found.docs,
+          pages: found.read,
+          used: found.pages.length,
+          mode: found.mode,
+        };
+        if (!found.pages.length)
           return json({
-            answer: "관련 자료를 찾지 못했습니다. 검색 범위나 단어를 바꿔 보세요.",
+            answer:
+              "고른 범위에서 읽을 수 있는 자료를 찾지 못했습니다. 범위를 '전체 자료'로 바꾸거나, 스캔본이면 글자 인식을 먼저 해 주세요.",
             sources: [],
+            scope,
           });
+        // 이어 묻기: 앞 대화 3개까지
+        const hist = Array.isArray(body.history)
+          ? (body.history as { q?: string; a?: string }[])
+              .slice(-3)
+              .map(
+                (h) =>
+                  `Q: ${String(h.q ?? "").slice(0, 300)}\nA: ${String(h.a ?? "").slice(0, 1200)}`,
+              )
+              .join("\n\n")
+          : "";
         const fmt = body.output_format ? `\n출력 형식: ${body.output_format}` : "";
         const r = await callClaude(
           sb,
           user.id,
           "ask",
           model,
-          BASE_RULES + fmt,
-          `[자료]\n${pagesBlock(pages)}\n\n[질문]\n${q}`,
+          BASE_RULES + ASK_RULES + fmt,
+          `[자료]\n${askBlock(found.pages)}\n\n${hist ? `[앞 대화]\n${hist}\n\n` : ""}[질문]\n${q}`,
+          3000,
+          "medium",
         );
-        return json({ answer: r.text, sources: sources(pages), cost_usd: r.cost });
+        // 답변에 실제로 인용된 쪽을 출처로(없으면 관련도 높은 쪽 6개)
+        const cited = found.pages.filter((p) => r.text.includes(`${p.title} p.${p.page_no}`));
+        return json({
+          answer: r.text,
+          sources: sources(cited.length ? cited : found.pages.slice(0, 6)),
+          scope,
+          cost_usd: r.cost,
+        });
       }
 
       // ② 작성·요약·콘텐츠 변환: 앱이 고른 재료(materials)로 생성
