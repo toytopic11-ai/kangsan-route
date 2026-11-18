@@ -323,15 +323,112 @@ Deno.serve(async (req) => {
 {"title":"표 제목","unit":"천원|원|명|건|% 등","series":["계열1","계열2"],"rows":[{"label":"항목","values":[숫자,숫자]}]}
 규칙: 숫자는 쉼표 없는 숫자(음수·△는 음수). 빈 칸은 null. series 는 열 머리글(예: 2025년, 2026년).
 행은 최대 20개, 같은 수준의 항목만(관·항이 섞이면 상위 수준 우선). 합계·소계 행은 제외.
-단위는 표에 적힌 단위 그대로. 원문에 없는 숫자를 만들지 않는다.${focus ? `
-사용자 요청: ${focus}` : ""}`,
+단위는 표에 적힌 단위 그대로. 원문에 없는 숫자를 만들지 않는다.${
+            focus
+              ? `
+사용자 요청: ${focus}`
+              : ""
+          }`,
           String(body.text ?? "").slice(0, 30000),
           4000,
         );
         const t = parseJson(r.text, null as null | Record<string, unknown>);
         if (!t || !Array.isArray(t.rows) || !t.rows.length)
-          return json({ error: "표를 찾지 못했습니다. 쪽 범위를 바꾸거나 붙여넣기로 입력해 주세요." }, 422);
+          return json(
+            { error: "표를 찾지 못했습니다. 쪽 범위를 바꾸거나 붙여넣기로 입력해 주세요." },
+            422,
+          );
         return json({ table: t, cost_usd: r.cost });
+      }
+
+      // ④-3 AI 자료 가공: 1쪽 요약 카드(brief) · 질의 포인트(questions) — 결과 보관, 다시 보면 비용 0
+      case "analyze_doc": {
+        const kind = body.kind === "questions" ? "questions" : "brief";
+        const docId = String(body.document_id ?? "");
+        if (!docId) return json({ error: "자료를 지정해 주세요." }, 400);
+        if (!body.refresh) {
+          const { data: hit } = await sb
+            .from("ai_outputs")
+            .select("content, created_at")
+            .eq("document_id", docId)
+            .eq("kind", kind)
+            .eq("ref", "")
+            .maybeSingle();
+          if (hit)
+            return json({
+              result: hit.content,
+              cached: true,
+              created_at: hit.created_at,
+              cost_usd: 0,
+            });
+        }
+        const { data: d } = await sb
+          .from("documents")
+          .select("title")
+          .eq("id", docId)
+          .maybeSingle();
+        if (!d) return json({ error: "자료를 찾지 못했습니다." }, 404);
+        const { data: pg } = await sb
+          .from("doc_pages")
+          .select("page_no, content")
+          .eq("document_id", docId)
+          .order("page_no")
+          .limit(300);
+        let text = "";
+        for (const p of (pg ?? []) as { page_no: number; content: string }[]) {
+          if (!p.content?.trim()) continue;
+          const chunk = `[p.${p.page_no}]\n${p.content.trim()}\n\n`;
+          if (text.length + chunk.length > 45000) break;
+          text += chunk;
+        }
+        if (!text)
+          return json(
+            { error: "이 자료에는 읽을 글자가 없습니다(스캔본이면 먼저 글자 인식을 해 주세요)." },
+            422,
+          );
+        const spec =
+          kind === "brief"
+            ? `자료의 '1쪽 요약 카드'를 만든다. JSON 객체만 출력:
+{"one_line":"자료 전체를 한 문장으로","summary":["핵심1","핵심2","핵심3"],"numbers":[{"label":"항목","value":"숫자와 단위 그대로","page":쪽번호}],"issues":[{"title":"쟁점","detail":"대의원이 주목할 이유 1~2문장","page":쪽번호}],"keywords":["키워드"]}
+numbers 최대 6개(금액·인원·비율 등 핵심 숫자), issues 최대 4개, keywords 최대 6개. 쪽번호는 [p.N] 표시 기준 숫자.`
+            : `대의원 입장에서 이 자료로 회의 때 물어볼 '질의 포인트' 10개를 뽑는다. JSON 배열만 출력:
+[{"question":"집행부에 할 질의 문장(존댓말, 구체적으로)","why":"근거·이유 1문장","page":쪽번호,"priority":"상|중|하"}]
+예산 증감이 큰 항목, 근거가 빠진 내용, 규정과 어긋날 수 있는 부분, 집행 실적을 우선. 우선순위 높은 순.`;
+        const r = await callClaude(
+          sb,
+          user.id,
+          `analyze_${kind}`,
+          model,
+          `${BASE_RULES}\n\n${spec}\n원문에 없는 숫자·사실을 만들지 않는다. 출처 표기는 page 값으로만 한다.`,
+          `[자료: ${d.title}]\n${text}`,
+          4000,
+        );
+        const result = parseJson(r.text, null as unknown);
+        if (!result) return json({ error: "결과를 읽지 못했습니다. 다시 시도해 주세요." }, 502);
+        // 보관(테이블이 아직 없으면 조용히 넘어감)
+        await sb
+          .from("ai_outputs")
+          .upsert(
+            {
+              user_id: user.id,
+              document_id: docId,
+              kind,
+              ref: "",
+              content: result,
+              cost_usd: r.cost,
+            },
+            { onConflict: "user_id,document_id,kind,ref" },
+          )
+          .then(
+            () => undefined,
+            () => undefined,
+          );
+        return json({
+          result,
+          cached: false,
+          created_at: new Date().toISOString(),
+          cost_usd: r.cost,
+        });
       }
 
       // ⑤ 규정 조문 분해 → JSON
