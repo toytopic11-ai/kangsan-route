@@ -72,6 +72,10 @@ textarea{resize:vertical;line-height:1.6}
 .slider output{font-variant-numeric:tabular-nums;text-align:right}
 input[type=range]{accent-color:var(--accent);width:100%}
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
+.cands{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.cands button{padding:0;border:2px solid transparent;border-radius:10px;background:none;cursor:pointer;overflow:hidden;min-width:0}
+.cands img{display:block;width:100%;aspect-ratio:9/16;object-fit:cover}
+.cands button[aria-pressed=true]{border-color:var(--accent)}
 .prompt{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:110px}
 details summary{cursor:pointer;color:var(--muted);font-size:13px}
 .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg)}
@@ -143,18 +147,28 @@ footer{color:var(--muted);font-size:12px;text-align:center}
             <input type="password" id="apiKey" autocomplete="off" placeholder="AIza...">
           </label>
           <label class="check"><input type="checkbox" id="rememberKey"> 이 기기에 키 기억하기</label>
+          <p class="hint"><b>순서:</b> ① 후보 사진 4장을 받아 레퍼런스와 가장 닮은 1장을 고르고 → ② 그 사진 그대로 Veo가 움직이게 합니다. 사진을 먼저 고르기 때문에 엉뚱한 영상이 나오지 않아요.</p>
           <div class="tabs">
-            <button class="btn small" id="genImg" type="button">AI 사진 생성 (약 10초)</button>
-            <button class="btn small" id="genVid" type="button">사진→움직이는 영상 (Veo, 1~3분)</button>
+            <button class="btn small" id="genImg" type="button">① 후보 사진 4장 만들기 (약 15초)</button>
+          </div>
+          <div class="cands" id="cands" hidden></div>
+          <label class="f">영상 품질
+            <div class="seg" id="veoSeg" role="group" aria-label="영상 품질">
+              <button type="button" data-v="fast" aria-pressed="true">Fast · 1편 약 1,300원</button>
+              <button type="button" data-v="best" aria-pressed="false">최고화질 · 약 4,500원</button>
+            </div>
+          </label>
+          <div class="tabs">
+            <button class="btn small" id="genVid" type="button">② 고른 사진을 움직이는 영상으로 (Veo, 1~3분)</button>
           </div>
           <p class="status" id="aiStatus" style="text-align:left"></p>
           <details>
-            <summary>고급: 모델 이름</summary>
+            <summary>고급: 모델 이름 직접 지정</summary>
             <div class="row" style="margin-top:8px">
-              <label class="f">사진 모델 <input type="text" id="imgModel" value="imagen-4.0-generate-001"></label>
-              <label class="f">영상 모델 <input type="text" id="vidModel" value="veo-3.0-fast-generate-001"></label>
+              <label class="f">사진 모델 <input type="text" id="imgModel" placeholder="비우면 자동 (imagen-4.0…)"></label>
+              <label class="f">영상 모델 <input type="text" id="vidModel" placeholder="비우면 자동 (veo-3.1…)"></label>
             </div>
-            <p class="hint" style="margin-top:6px">Google이 모델 이름을 바꾸면 여기서 고쳐 넣으세요. 키 발급: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a></p>
+            <p class="hint" style="margin-top:6px">비워 두면 최신 모델부터 차례로 시도합니다. 키 발급: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a></p>
           </details>
           <p class="note">API 키가 없으면 아래 프롬프트를 복사해 Gemini 앱·Mirra·Kling 등에 붙여 넣어 만든 뒤 <b>내 사진·영상</b>으로 올려 주세요.</p>
         </div>
@@ -164,6 +178,8 @@ footer{color:var(--muted);font-size:12px;text-align:center}
             <input type="file" id="bgFile" accept="image/*,video/*">
           </label>
           <p class="hint">AI 앱에서 만든 사진·영상, 직접 찍은 포항 풍경 모두 좋아요. 영상이 10초보다 짧으면 자동으로 느리게 재생해 길이를 맞춥니다.</p>
+          <button class="btn small" id="genVid2" type="button">올린 사진을 Veo로 움직이기</button>
+          <p class="hint">마음에 드는 레퍼런스 분위기의 사진을 올리고 이 버튼을 누르면, 그 사진의 구도·색감을 그대로 유지한 채 구름·파도만 움직입니다. (API 키는 'AI로 생성' 탭에 입력)</p>
         </div>
 
         <div id="tab-scene" hidden>
@@ -277,8 +293,13 @@ const FONTS = [
 const AUTHOR_FONT = "Gowun Batang";
 
 const KOREAN = "All people in the scene are Korean (ethnically Korean adults with natural Korean appearance, hairstyles and everyday Korean clothing).";
-const COMMON = "Composition: the upper 45% of the frame is calm, clean negative space (soft sky, mist or plain background) reserved for text; the main subject is small and placed in the lower third. Style: cinematic film photograph, 35mm lens, soft natural light, gentle pastel color grading, slightly faded highlights, subtle film grain, photorealistic, high detail. No text, no letters, no watermark, no logo, no border.";
-const MOTION_SUFFIX = "Animate subtly and slowly as a calm 8-second shot. Static tripod camera with an extremely slow push-in. No cuts, no camera shake, no text, natural realistic movement.";
+// 레퍼런스(감성 글귀 릴스) 화면을 분석해 고정한 스타일 규칙
+const COMMON = "STYLE LOCK, match this exact look: a quiet Korean 'good words' quote reel background photo. Bright, airy, softly overexposed photograph with low contrast and gently desaturated pastel colors (muted peach, dusty blue, fog gray, pale cream). The entire upper half of the frame is plain, smooth sky, mist or softly blurred background with no objects, no birds, no visible sun disk and no busy detail, so handwritten text can sit on it. The subject is small, in the lower 35% of the frame, seen from behind or in silhouette with faces not visible, standing still or walking slowly. Real-world location, eye-level wide shot, 35mm lens, soft diffused natural light, faint film grain, like a calm editorial lifestyle photo. Photorealistic. Absolutely no text, letters, captions, logos, watermarks, borders or frames.";
+const MOTION_SUFFIX = "Locked-off tripod camera: no pan, no zoom, no cuts. Calm, slow, realistic motion only.";
+const VEO_LOCK = "Animate this exact photograph as one continuous 8-second shot. Keep the composition, framing, colors, lighting, location and every person exactly as in the image; nobody turns toward the camera and faces stay hidden; no new people or objects appear. Only subtle natural motion: ";
+const VEO_NEG = "text, letters, subtitles, captions, watermark, logo, camera pan, zoom, camera shake, cuts, scene change, new people appearing, people turning to the camera, close-up faces, saturated colors, cartoon, CGI look, distorted bodies, fast motion";
+const IMG_MODELS = ["imagen-4.0-generate-001","imagen-4.0-fast-generate-001","imagen-3.0-generate-002"];
+const VID_MODELS = {fast:["veo-3.1-fast-generate-preview","veo-3.1-fast-generate-001","veo-3.0-fast-generate-001"], best:["veo-3.1-generate-preview","veo-3.1-generate-001","veo-3.0-generate-001"]};
 
 const SCENES = [
   {id:"beach", n:"노을 해변 산책", d:"노을 진 동해 바닷가를 반려견과 걷는 중년 부부의 뒷모습", people:true, mood:"piano", grade:"warm",
@@ -732,26 +753,42 @@ function apiKey(){ const k = $("#apiKey").value.trim(); if (!k) { aiMsg("Gemini 
 function netErr(e){ return (e instanceof TypeError) ? "외부 연결이 막혀 있어요. Claude 미리보기 화면에서는 AI 호출이 차단됩니다. GitHub/Netlify에 올린 버전에서 쓰거나, 프롬프트를 복사해 Gemini 앱에서 만든 뒤 '내 사진·영상'으로 올려 주세요." : (e.message || String(e)); }
 function imgAspect(){ return {"9:16":"9:16","4:5":"3:4","1:1":"1:1","16:9":"16:9"}[S.ratio]; }
 function vidAspect(){ return S.ratio === "16:9" ? "16:9" : "9:16"; }
+function modelList(field, defaults){ const v = $(field).value.trim(); return [...new Set([v, ...defaults].filter(Boolean))]; }
+// 모델 이름이 바뀌어도 동작하도록: 404/미지원이면 다음 후보 모델로 자동 재시도
+async function callModels(list, method, body, key){
+  let last = null;
+  for (const m of list){
+    const r = await fetch(`${API}/models/${encodeURIComponent(m)}:${method}`, {method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key}, body: JSON.stringify(body)});
+    const j = await r.json().catch(() => ({})); if (r.ok) return {j, model: m};
+    const msg = (j.error && j.error.message) || ("오류 " + r.status);
+    if (r.status === 404 || /not found|not supported|is not available/i.test(msg)) { last = new Error(msg); continue; }
+    throw new Error(msg);
+  }
+  throw last || new Error("사용 가능한 모델을 찾지 못했어요.");
+}
+function pickCandidate(i, list){ aiImage = list[i]; $("#cands").querySelectorAll("button").forEach((b, k) => b.setAttribute("aria-pressed", String(k === i)));
+  return useImageUrl(`data:${aiImage.mime};base64,${aiImage.b64}`); }
 async function genImage(){
-  const key = apiKey(); if (!key) return; const b = $("#genImg"); b.disabled = true; aiMsg("AI가 사진을 그리는 중… (10~20초)");
+  const key = apiKey(); if (!key) return; const b = $("#genImg"); b.disabled = true; aiMsg("AI가 후보 사진 4장을 그리는 중… (15~30초)");
   try {
-    const r = await fetch(`${API}/models/${encodeURIComponent($("#imgModel").value.trim())}:predict`, {method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key},
-      body: JSON.stringify({instances:[{prompt: $("#imgPrompt").value}], parameters:{sampleCount:1, aspectRatio: imgAspect()}})});
-    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error((j.error && j.error.message) || ("오류 " + r.status));
-    const p = j.predictions && j.predictions[0]; if (!p || !p.bytesBase64Encoded) throw new Error("사진이 만들어지지 않았어요. 프롬프트를 조금 바꿔 다시 시도해 주세요.");
-    aiImage = {b64: p.bytesBase64Encoded, mime: p.mimeType || "image/png"};
-    await useImageUrl(`data:${aiImage.mime};base64,${aiImage.b64}`); aiMsg("AI 사진 완성! 더 생생하게 하려면 '사진→움직이는 영상'을 눌러 보세요.", "ok");
+    const {j, model} = await callModels(modelList("#imgModel", IMG_MODELS), "predict", {instances:[{prompt: $("#imgPrompt").value}], parameters:{sampleCount:4, aspectRatio: imgAspect()}}, key);
+    const list = (j.predictions || []).filter(p => p.bytesBase64Encoded).map(p => ({b64: p.bytesBase64Encoded, mime: p.mimeType || "image/png"}));
+    if (!list.length) throw new Error("사진이 만들어지지 않았어요. (안전 필터일 수 있어요) 프롬프트를 조금 바꿔 다시 시도해 주세요.");
+    const box = $("#cands"); box.innerHTML = ""; box.hidden = false;
+    list.forEach((c, i) => { const bt = document.createElement("button"); bt.type = "button"; bt.setAttribute("aria-label", `후보 ${i+1}`); const im = document.createElement("img"); im.src = `data:${c.mime};base64,${c.b64}`; im.alt = ""; bt.appendChild(im); bt.onclick = () => pickCandidate(i, list); box.appendChild(bt); });
+    await pickCandidate(0, list);
+    aiMsg(`후보 ${list.length}장 완성 (${model}). 레퍼런스와 가장 닮은 사진을 눌러 고른 뒤 ②를 누르세요.`, "ok");
   } catch(e){ aiMsg(netErr(e), "err"); } finally { b.disabled = false; }
 }
 async function genVideo(){
-  const key = apiKey(); if (!key) return; const b = $("#genVid"); b.disabled = true;
+  const key = apiKey(); if (!key) { if (S.bg !== "ai") setStatus("'AI로 생성' 탭에 Gemini API 키를 먼저 넣어 주세요.", "err"); return; }
+  const b = $("#genVid"), b2 = $("#genVid2"); b.disabled = b2.disabled = true;
   try {
-    if (!aiImage){ aiMsg("먼저 AI 사진을 만들고 있어요…"); b.disabled = false; await genImage(); b.disabled = true; if (!aiImage) return; }
-    aiMsg("Veo가 사진을 움직이는 영상으로 만드는 중… (1~3분, 창을 닫지 마세요)");
-    const prompt = $("#imgPrompt").value + "\n\nMotion: " + $("#vidPrompt").value;
-    const r = await fetch(`${API}/models/${encodeURIComponent($("#vidModel").value.trim())}:predictLongRunning`, {method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key},
-      body: JSON.stringify({instances:[{prompt, image:{bytesBase64Encoded: aiImage.b64, mimeType: aiImage.mime}}], parameters:{aspectRatio: vidAspect(), negativePrompt:"text, subtitles, watermark, logo, distorted faces, fast camera movement"}})});
-    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error((j.error && j.error.message) || ("오류 " + r.status));
+    if (!aiImage){ aiMsg("먼저 ① 후보 사진을 만들거나 '내 사진·영상'에서 사진을 올려 주세요.", "err"); return; }
+    aiMsg("Veo가 고른 사진을 그대로 움직이는 중… (1~3분, 창을 닫지 마세요)"); setStatus("Veo 영상 생성 중…");
+    const prompt = VEO_LOCK + $("#vidPrompt").value;
+    const {j} = await callModels(modelList("#vidModel", VID_MODELS[S.veo] || VID_MODELS.fast), "predictLongRunning",
+      {instances:[{prompt, image:{bytesBase64Encoded: aiImage.b64, mimeType: aiImage.mime}}], parameters:{aspectRatio: vidAspect(), negativePrompt: VEO_NEG}}, key);
     let op = j; const t0 = Date.now();
     while (!op.done){ if (Date.now() - t0 > 6*60e3) throw new Error("6분이 지나도 완성되지 않았어요. 잠시 후 다시 시도해 주세요.");
       await new Promise(r => setTimeout(r, 8000)); aiMsg(`Veo 영상 생성 중… ${Math.round((Date.now()-t0)/1000)}초 경과`);
@@ -763,10 +800,11 @@ async function genVideo(){
     aiMsg("영상을 내려받는 중…");
     let vr; try { vr = await fetch(uri, {headers:{"x-goog-api-key":key}}); if (!vr.ok) throw 0; } catch(e){ vr = await fetch(uri + (uri.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(key)); }
     if (!vr.ok) throw new Error("영상 내려받기 실패 (" + vr.status + ")");
-    const blob = await vr.blob(); await useVideoBlob(blob); aiMsg("AI 영상 배경 완성! 미리보기를 재생해 보세요.", "ok");
-  } catch(e){ aiMsg(netErr(e), "err"); } finally { b.disabled = false; }
+    const blob = await vr.blob(); await useVideoBlob(blob); aiMsg("AI 영상 배경 완성! 미리보기를 재생해 보세요.", "ok"); setStatus("Veo 영상 배경을 넣었어요. 미리보기를 재생해 보세요.", "ok");
+  } catch(e){ aiMsg(netErr(e), "err"); setStatus(netErr(e), "err"); } finally { b.disabled = b2.disabled = false; }
 }
-$("#genImg").onclick = genImage; $("#genVid").onclick = genVideo;
+$("#genImg").onclick = genImage; $("#genVid").onclick = genVideo; $("#genVid2").onclick = genVideo;
+S.veo = S.veo || "fast";
 try { const k = localStorage.getItem("gyv-key"); if (k) { $("#apiKey").value = k; $("#rememberKey").checked = true; } } catch(e){}
 function keyPersist(){ try { if ($("#rememberKey").checked) localStorage.setItem("gyv-key", $("#apiKey").value.trim()); else localStorage.removeItem("gyv-key"); } catch(e){} }
 $("#rememberKey").onchange = keyPersist; $("#apiKey").onchange = keyPersist;
@@ -778,7 +816,12 @@ function useVideoBlob(blob){ return new Promise((res, rej) => { const v = docume
   v.onseeked = () => { if (!playing && !recording) frame(+scrub.value); };
   v.onerror = () => rej(new Error("영상을 열 수 없어요. mp4 파일을 써 주세요.")); }); }
 $("#bgFile").onchange = async e => { const f = e.target.files[0]; if (!f) return; stop();
-  try { if (f.type.startsWith("video")) await useVideoBlob(f); else await useImageUrl(URL.createObjectURL(f)); setStatus("배경을 불러왔어요.", "ok"); } catch(err){ setStatus(err.message, "err"); } };
+  try {
+    if (f.type.startsWith("video")) { await useVideoBlob(f); setStatus("배경 영상을 불러왔어요.", "ok"); return; }
+    const dataUrl = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(f); });
+    const m = /^data:([^;]+);base64,(.*)$/.exec(dataUrl); if (m) aiImage = {mime: m[1], b64: m[2]};
+    await useImageUrl(dataUrl); setStatus("사진을 불러왔어요. 'Veo로 움직이기'를 누르면 이 사진 그대로 영상이 됩니다.", "ok");
+  } catch(err){ setStatus(err.message || "파일을 열 수 없어요.", "err"); } };
 $("#musicFile").onchange = async e => { const f = e.target.files[0]; if (!f) return; try { userMusic = await ac().decodeAudioData(await f.arrayBuffer()); setStatus("내 음악을 넣었어요. 영상 길이에 맞춰 앞부분이 쓰이고 끝은 서서히 줄어듭니다.", "ok"); } catch(err){ setStatus("음악 파일을 읽지 못했어요.", "err"); } };
 
 /* ---------------- 프롬프트 ---------------- */
@@ -812,6 +855,7 @@ segment($("#durSeg"), [["10","10초"],["15","15초"],["20","20초"]], "dur", () 
 bindSeg($("#inkSeg"), "ink", () => { lineCache.clear(); refresh(); });
 bindSeg($("#posSeg"), "pos", () => { sampleInk(); refresh(); });
 bindSeg($("#qSeg"), "q");
+bindSeg($("#veoSeg"), "veo");
 bindSeg($("#bgTabs"), "bg", () => showBgTab(true));
 function showBgTab(user){ ["ai","upload","scene"].forEach(k => $("#tab-" + k).hidden = S.bg !== k); if (user && S.bg === "scene"){ stop(); src = {type:"scene"}; buildBase(); refresh(); } }
 
