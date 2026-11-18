@@ -59,6 +59,7 @@ textarea{resize:vertical;line-height:1.6}
 .scene{border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:5px;cursor:pointer;color:var(--fg);font:inherit;text-align:left;display:flex;flex-direction:column;gap:4px}
 .scene canvas{width:100%;aspect-ratio:9/16;border-radius:8px;display:block;max-width:100%}
 .scene span{font-size:12px;line-height:1.3;padding:0 2px 2px}
+.scene em{font-style:normal;font-size:10.5px;color:var(--muted);padding:0 2px 3px;line-height:1.2}
 .scene[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .fonts{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
 .chip{border:1px solid var(--line);background:var(--panel2);color:var(--fg);border-radius:12px;padding:8px 6px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -129,7 +130,9 @@ footer{color:var(--muted);font-size:12px;text-align:center}
       </div>
 
       <div class="panel">
-        <h2><span><span class="step">2</span>장면 스타일</span><small>12가지 · 인물은 모두 한국인으로 생성</small></h2>
+        <h2><span><span class="step">2</span>장면 스타일</span><small id="sceneCount">30가지 · 인물은 모두 한국인으로 생성</small></h2>
+        <div class="seg" id="seasonSeg" role="group" aria-label="계절"></div>
+        <div class="seg" id="feelSeg" role="group" aria-label="느낌"></div>
         <div class="scenes" id="scenes"></div>
         <p class="hint" id="sceneDesc"></p>
       </div>
@@ -302,54 +305,134 @@ const IMG_MODELS = ["imagen-4.0-generate-001","imagen-4.0-fast-generate-001","im
 const VID_MODELS = {fast:["veo-3.1-fast-generate-preview","veo-3.1-fast-generate-001","veo-3.0-fast-generate-001"], best:["veo-3.1-generate-preview","veo-3.1-generate-001","veo-3.0-generate-001"]};
 
 const SCENES = [
-  {id:"beach", n:"노을 해변 산책", d:"노을 진 동해 바닷가를 반려견과 걷는 중년 부부의 뒷모습", people:true, mood:"piano", grade:"warm",
+  // ── 바다 · 물가 ──
+  {id:"beach", n:"노을 해변 산책", season:["여름","사계절"], feel:["평온","사랑"], d:"노을 진 동해 바닷가를 반려견과 걷는 중년 부부의 뒷모습", people:true, mood:"piano", grade:"warm",
    img:"A Korean middle-aged couple walking a small dog along a wet sandy beach on the east coast of Korea at sunset, seen from behind as soft silhouettes, pastel orange and pink sky reflected on the wet sand, gentle waves.",
    mo:"waves gently rolling onto the shore, the couple and the dog slowly walking away, clouds drifting",
    g:{sky:["#f6eee0","#f8d2a4","#f3aa8c","#d9a6bb"], cloud:{c:"255,238,218",amt:.55,lo:.04,hi:.5}, sun:{x:.5,y:.62,r:.55,c:"255,214,160"}, ground:{t:"sea",y:.63,top:"#c9a6bb",bot:"#9c95b8",beach:true}}},
-  {id:"field", n:"안개 낀 들판", d:"안개 낀 보리밭에서 휴대폰을 보는 청년의 뒷모습", people:true, mood:"pad", grade:"calm",
-   img:"A young Korean man with a backpack and a cap standing in a misty green barley field in the Korean countryside at dawn, seen from behind, looking down at his phone, soft fog, tall grass in the foreground.",
-   mo:"fog slowly drifting across the field, grass swaying in a light breeze",
-   g:{sky:["#f2f3ef","#e6eae3","#d4dbcf"], cloud:{c:"255,255,255",amt:.55,lo:.35,hi:.75}, ground:{t:"field",y:.62}}},
-  {id:"summit", n:"구름 위 산 정상", d:"운해 위 바위 정상에 선 등산객 (흑백 사진)", people:true, mood:"night", grade:"mono",
-   img:"A Korean hiker in a padded winter jacket standing on a rocky summit of a Korean mountain like Seoraksan, above a vast sea of clouds, seen from behind, black and white photograph, dramatic soft clouds.",
-   mo:"clouds flowing slowly below and behind the summit",
-   g:{sky:["#f3f3f3","#dedede","#c4c4c4"], cloud:{c:"252,252,252",amt:.95,lo:0,hi:.86}, ground:{t:"ridge",y:.86,color:"#1c1c1c",peak:true}, mono:true}},
-  {id:"city", n:"해질녘 도시 전망", d:"언덕 위에서 서울 야경을 내려다보는 청년", people:true, mood:"night", grade:"film",
-   img:"A young Korean man in a denim jacket standing on a hilltop overlooking the city lights of Seoul at dusk, seen from behind, wind in his hair, hazy purple-pink twilight sky, distant mountains.",
-   mo:"city lights twinkling, his hair moving in the wind, haze drifting",
-   g:{sky:["#dbd6d5","#d0bfc3","#a99eab"], cloud:{c:"240,225,228",amt:.25,lo:.05,hi:.4}, ground:{t:"city",y:.6}}},
-  {id:"pier", n:"포항 바닷가 방파제", d:"흐린 아침 방파제 난간의 부부와 낚시하는 어르신", people:true, mood:"piano", grade:"film",
+  {id:"beachrun", n:"바닷가를 달리는 사람", season:["여름"], feel:["도전","희망"], d:"해 뜨는 해변을 홀로 달리는 청년", people:true, mood:"hope", grade:"warm",
+   img:"A young Korean man in a simple running outfit jogging alone along the waterline of a wide sandy beach in Korea at sunrise, seen from behind and small in the frame, soft golden light, footprints in the wet sand, calm sea.",
+   mo:"the runner moving steadily away along the shore, small waves washing over the sand, soft light shimmering on the water",
+   g:{sky:["#f4f0e7","#f6dec2","#f2c19d"], cloud:{c:"255,245,232",amt:.35,lo:.05,hi:.45}, sun:{x:.62,y:.6,r:.5,c:"255,222,175"}, ground:{t:"sea",y:.62,top:"#d9c3b4",bot:"#a6a7b8",beach:true}}},
+  {id:"sunrise", n:"호미곶 해맞이", season:["겨울","사계절"], feel:["희망"], d:"포항 호미곶에서 새해 해돋이를 바라보는 가족", people:true, mood:"hope", grade:"warm",
+   img:"A small Korean family in winter coats standing on the seaside promenade at Homigot in Pohang, Korea, watching the sunrise over the East Sea, seen from behind as small silhouettes, pale blue sky warming to soft peach near the horizon.",
+   mo:"the sun slowly rising at the horizon, light spreading across calm water, the family standing still",
+   g:{sky:["#e8edf2","#f2d9c5","#f0aa8b"], cloud:{c:"255,236,222",amt:.3,lo:.05,hi:.45}, sun:{x:.5,y:.64,r:.45,c:"255,205,150"}, ground:{t:"sea",y:.65,top:"#9a9fb4",bot:"#4c536a"}}},
+  {id:"pier", n:"포항 바닷가 방파제", season:["사계절"], feel:["사랑","평온"], d:"흐린 아침 방파제 난간의 부부와 낚시하는 어르신", people:true, mood:"piano", grade:"film",
    img:"A Korean couple in their thirties standing by the railing of a seaside breakwater in Pohang, Korea on a hazy morning, one holding a canned coffee, an elderly Korean man fishing nearby, muted film tones, calm gray sea.",
    mo:"calm sea rippling, the couple chatting quietly, the fishing line moving slightly",
    g:{sky:["#f1f0eb","#e9e7e0","#dddcd5"], cloud:{c:"255,255,255",amt:.2,lo:.1,hi:.5}, ground:{t:"sea",y:.66,top:"#cacbc7",bot:"#a3a6a3"}}},
-  {id:"lake", n:"산정 호수 여행", d:"설산과 호수 앞 바위에 선 여행자", people:true, mood:"hope", grade:"natural",
-   img:"A Korean traveler with a backpack standing on a rock at the edge of a clear alpine lake surrounded by snow-capped mountains, seen from behind, bright blue sky with one large white cumulus cloud.",
-   mo:"water rippling gently, the cloud slowly moving",
-   g:{sky:["#6ea2d6","#93bce5","#cfe2f2"], cloud:{c:"255,255,255",amt:.85,lo:.3,hi:.62}, ground:{t:"lake",y:.6}}},
-  {id:"flower", n:"작은 들꽃", d:"분홍빛 흐림 속 파란 들꽃 한 송이 (인물 없음)", people:false, mood:"musicbox", grade:"calm",
-   img:"A single delicate small blue wildflower on a thin stem, extreme close-up macro, soft pink and cream bokeh background, dreamy pastel light. No people.",
-   mo:"the flower swaying very gently in a soft breeze, bokeh shimmering",
-   g:{t:"flower"}},
-  {id:"pinwheel", n:"바람개비 하늘", d:"파란 하늘과 뭉게구름 (인물 없음)", people:false, mood:"hope", grade:"natural",
-   img:"A blue and white paper pinwheel held up against a bright blue summer sky with fluffy white clouds, low angle. No people visible.",
-   mo:"the pinwheel spinning slowly, clouds drifting",
-   g:{sky:["#3d7dc3","#6aa1da","#a7c9eb"], cloud:{c:"255,255,255",amt:1,lo:0,hi:1}, ground:{t:"none"}}},
-  {id:"whale", n:"고래의 바다", d:"잿빛 바다 위로 솟구치는 혹등고래 (인물 없음)", people:false, mood:"pad", grade:"calm",
+  {id:"wintersea", n:"겨울 바다 앞에서", season:["겨울"], feel:["위로","그리움"], d:"잿빛 겨울 바다 앞에 홀로 선 중년 남성", people:true, mood:"night", grade:"calm",
+   img:"A Korean middle-aged man in a long dark winter coat standing alone on an empty beach in winter, facing a cold gray-blue sea, seen from behind and small in the frame, overcast pale sky, quiet and reflective.",
+   mo:"slow gray waves breaking softly, his coat moving slightly in the wind",
+   g:{sky:["#e7eaed","#d8dde2","#c6cdd4"], cloud:{c:"250,250,252",amt:.4,lo:.05,hi:.55}, ground:{t:"sea",y:.64,top:"#87939e",bot:"#414c57"}}},
+  {id:"tidal", n:"갯벌 위 아버지와 아이", season:["여름"], feel:["사랑","그리움"], d:"해질녘 갯벌을 손잡고 걷는 아버지와 아이", people:true, mood:"piano", grade:"warm",
+   img:"A Korean father and his young child holding hands, walking across a wide shiny tidal flat on the west coast of Korea at sunset, seen from behind as small silhouettes, the wet mud reflecting a soft pink and orange sky.",
+   mo:"father and child walking slowly, shallow water shimmering, clouds drifting",
+   g:{sky:["#f3e6d8","#f2c4a2","#da9c8e"], cloud:{c:"255,232,215",amt:.35,lo:.05,hi:.5}, sun:{x:.45,y:.62,r:.5,c:"255,208,165"}, ground:{t:"sea",y:.64,top:"#c9a0a0",bot:"#8e7884",beach:true}}},
+  {id:"whale", n:"고래의 바다", season:["사계절"], feel:["도전"], d:"잿빛 바다 위로 솟구치는 혹등고래 (인물 없음)", people:false, mood:"pad", grade:"calm",
    img:"A humpback whale breaching out of a calm gray sea off the coast of Korea, water splashing, overcast pale gray sky, muted monochrome tones. No people.",
    mo:"the whale rising slowly out of the water in slow motion, spray falling",
    g:{sky:["#eaebeb","#d8dadb","#c4c7c9"], cloud:{c:"250,250,250",amt:.45,lo:.05,hi:.6}, ground:{t:"sea",y:.7,top:"#8f9498",bot:"#4c5256"}}},
-  {id:"hill", n:"언덕 위 사람들", d:"해질녘 연못가 언덕의 연인과 친구들 실루엣", people:true, mood:"night", grade:"film",
+  // ── 호수 · 강 ──
+  {id:"ferry", n:"강가의 나룻배", season:["사계절"], feel:["평온","그리움"], d:"물안개 낀 강을 천천히 건너는 나룻배와 뱃사공", people:true, mood:"pad", grade:"film",
+   img:"A small old wooden ferry boat on a calm misty river in the Korean countryside at dawn, an elderly Korean boatman rowing slowly, seen from the side as a small figure, soft gray-green mist over the water, distant hills fading into fog.",
+   mo:"the boat gliding slowly across the water, the oar dipping gently, mist drifting over the river",
+   g:{sky:["#eef0ee","#e2e6e4","#d0d7d5"], cloud:{c:"255,255,255",amt:.6,lo:.4,hi:.8}, ground:{t:"sea",y:.6,top:"#c7d0ce",bot:"#97a5a3"}, boat:true}},
+  {id:"lakemist", n:"새벽 물안개 호수", season:["가을","사계절"], feel:["평온","위로"], d:"물안개가 피어오르는 고요한 새벽 호수 (인물 없음)", people:false, mood:"pad", grade:"calm",
+   img:"A calm lake in Korea at dawn with thick white mist rising from the water, a few willow trees on the far shore fading into fog, pale pastel sky, perfectly still water. No people.",
+   mo:"mist slowly rising and drifting across the still water, faint ripples",
+   g:{sky:["#f1f1ee","#e6e8e5","#d7dcd9"], cloud:{c:"255,255,255",amt:.75,lo:.45,hi:.85}, ground:{t:"lake",y:.62}}},
+  {id:"lakebench", n:"호숫가 벤치의 두 사람", season:["가을","사계절"], feel:["사랑","위로"], d:"호숫가 벤치에 나란히 앉아 이야기 나누는 두 사람", people:true, mood:"piano", grade:"film",
+   img:"Two Korean people, an older couple, sitting side by side on a wooden bench by a quiet lake in autumn, talking softly, seen from behind, a few golden trees around the lake, soft overcast light, calm water.",
+   mo:"they talk quietly with small natural gestures, leaves falling occasionally, gentle ripples on the lake",
+   g:{sky:["#f0ede6","#e7e1d5","#d8d2c4"], cloud:{c:"255,255,255",amt:.35,lo:.1,hi:.55}, ground:{t:"lake",y:.62}}},
+  {id:"lake", n:"산정 호수 여행", season:["여름"], feel:["희망"], d:"설산과 호수 앞 바위에 선 여행자", people:true, mood:"hope", grade:"natural",
+   img:"A Korean traveler with a backpack standing on a rock at the edge of a clear alpine lake surrounded by snow-capped mountains, seen from behind, bright blue sky with one large white cumulus cloud.",
+   mo:"water rippling gently, the cloud slowly moving",
+   g:{sky:["#6ea2d6","#93bce5","#cfe2f2"], cloud:{c:"255,255,255",amt:.85,lo:.3,hi:.62}, ground:{t:"lake",y:.6}}},
+  {id:"hill", n:"연못가 언덕 위 사람들", season:["사계절"], feel:["사랑"], d:"해질녘 연못가 언덕의 연인과 친구들 실루엣", people:true, mood:"night", grade:"film",
    img:"Silhouettes of a young Korean couple walking and a few Korean friends talking on a low hill beside a still pond at twilight, their reflections in the water, deep blue-violet sky fading to warm orange at the horizon.",
    mo:"the couple walking slowly, gentle ripples spreading on the pond",
    g:{sky:["#5e6797","#9a95b9","#d9aa8b","#e9b27f"], cloud:{c:"230,215,230",amt:.18,lo:.05,hi:.45}, ground:{t:"pond",y:.66}}},
-  {id:"ginkgo", n:"가을 은행나무길", d:"노란 은행잎이 지는 길을 걷는 여성", people:true, mood:"piano", grade:"warm",
+  // ── 산 ──
+  {id:"hikeclouds", n:"구름 흐르는 등산길", season:["사계절"], feel:["도전","희망"], d:"구름이 흘러가는 능선길을 오르는 등산객", people:true, mood:"hope", grade:"natural",
+   img:"A Korean hiker with trekking poles walking up a rocky ridge trail on a Korean mountain, seen from behind and small in the frame, white clouds flowing over the ridge and through the valley below, soft bright sky.",
+   mo:"clouds flowing steadily over the ridge, the hiker climbing slowly step by step",
+   g:{sky:["#dfe8f0","#e9eef2","#f3f3f1"], cloud:{c:"255,255,255",amt:.95,lo:.25,hi:.9}, ground:{t:"ridge",y:.84,color:"#2f3a2c"}}},
+  {id:"summit", n:"구름 위 산 정상", season:["사계절"], feel:["도전"], d:"운해 위 바위 정상에 선 등산객 (흑백 사진)", people:true, mood:"night", grade:"mono",
+   img:"A Korean hiker in a padded winter jacket standing on a rocky summit of a Korean mountain like Seoraksan, above a vast sea of clouds, seen from behind, black and white photograph, dramatic soft clouds.",
+   mo:"clouds flowing slowly below and behind the summit",
+   g:{sky:["#f3f3f3","#dedede","#c4c4c4"], cloud:{c:"252,252,252",amt:.95,lo:0,hi:.86}, ground:{t:"ridge",y:.86,color:"#1c1c1c",peak:true}, mono:true}},
+  {id:"snowtrail", n:"눈 덮인 산길", season:["겨울"], feel:["도전","위로"], d:"눈 덮인 산길을 홀로 걸어 오르는 사람", people:true, mood:"night", grade:"calm",
+   img:"A Korean person in a dark winter parka walking alone up a snow-covered mountain trail in Korea, seen from behind and small in the frame, footprints in fresh snow, snowy pine trees, pale blue-white sky, gentle snowfall.",
+   mo:"light snow falling slowly, the walker moving forward step by step, pine branches swaying slightly",
+   g:{sky:["#cfdcea","#e3eaf2","#f4f6f8"], cloud:{c:"255,255,255",amt:.4,lo:.1,hi:.6}, ground:{t:"snow",y:.66}, snow:true}},
+  {id:"temple", n:"산사의 아침", season:["사계절"], feel:["평온","위로"], d:"안개 낀 산사 돌계단을 오르는 방문객", people:true, mood:"pad", grade:"calm",
+   img:"A Korean visitor slowly climbing old stone steps toward a traditional Buddhist temple gate on a Korean mountain in morning fog, seen from behind and small in the frame, tall pine trees, soft gray-green tones, peaceful.",
+   mo:"fog drifting through the pine trees, the visitor climbing slowly",
+   g:{sky:["#eef0ee","#e4e7e4","#d3d9d4"], cloud:{c:"255,255,255",amt:.7,lo:.3,hi:.85}, ground:{t:"ridge",y:.76,color:"#56604f"}}},
+  {id:"city", n:"해질녘 도시 전망", season:["사계절"], feel:["도전","그리움"], d:"언덕 위에서 서울 야경을 내려다보는 청년", people:true, mood:"night", grade:"film",
+   img:"A young Korean man in a denim jacket standing on a hilltop overlooking the city lights of Seoul at dusk, seen from behind, wind in his hair, hazy purple-pink twilight sky, distant mountains.",
+   mo:"city lights twinkling, his hair moving in the wind, haze drifting",
+   g:{sky:["#dbd6d5","#d0bfc3","#a99eab"], cloud:{c:"240,225,228",amt:.25,lo:.05,hi:.4}, ground:{t:"city",y:.6}}},
+  // ── 한옥 · 비 ──
+  {id:"eaves", n:"한옥 처마의 빗방울", season:["여름","사계절"], feel:["평온","위로"], d:"기와 처마 끝에서 떨어지는 빗방울 (인물 없음)", people:false, mood:"pad", grade:"calm",
+   img:"Close-up of raindrops falling from the curved dark tiled eaves of a traditional Korean hanok roof, the eaves only along the very bottom edge of the frame, soft out-of-focus gray-green garden and misty sky above, calm rainy day. No people.",
+   mo:"steady rain dripping from the eaves, drops splashing softly, mist moving in the background",
+   g:{sky:["#e8eae8","#dcdfdd","#c9cecb"], cloud:{c:"255,255,255",amt:.5,lo:.2,hi:.8}, ground:{t:"ridge",y:.84,color:"#3a3f3d"}, rain:true}},
+  {id:"hanok", n:"한옥 마루의 비 오는 날", season:["여름"], feel:["그리움"], d:"비 오는 한옥 마루에 앉은 할머니", people:true, mood:"pad", grade:"calm",
+   img:"A Korean grandmother in a simple cardigan sitting on the wooden porch (maru) of a traditional Korean hanok, seen from the side, quiet rain falling from the tiled eaves, soft gray light, calm and nostalgic.",
+   mo:"rain dripping from the eaves, gentle steam rising from a teacup",
+   g:{sky:["#e7e8e7","#d9dbda","#c5c8c7"], cloud:{c:"255,255,255",amt:.5,lo:.2,hi:.8}, ground:{t:"ridge",y:.8,color:"#4a4e4d"}, rain:true}},
+  {id:"hanokvillage", n:"비 내리는 한옥마을", season:["여름","가을"], feel:["그리움","평온"], d:"우산을 쓰고 한옥마을 골목을 걷는 사람", people:true, mood:"piano", grade:"film",
+   img:"A Korean woman holding a clear umbrella walking slowly down a narrow stone alley of a traditional hanok village like Bukchon or Jeonju on a rainy day, seen from behind and small in the frame, wet stones reflecting soft light, misty sky above the tiled roofs.",
+   mo:"rain falling steadily, the woman walking away slowly, ripples in small puddles",
+   g:{sky:["#e6e7e6","#d6d9d8","#c1c6c4"], cloud:{c:"255,255,255",amt:.45,lo:.15,hi:.7}, ground:{t:"ridge",y:.74,color:"#3b403f"}, rain:true}},
+  // ── 봄 ──
+  {id:"cherry", n:"벚꽃길 산책", season:["봄"], feel:["희망","사랑"], d:"벚꽃 터널 아래를 걷는 엄마와 딸", people:true, mood:"musicbox", grade:"warm",
+   img:"A Korean mother and her grown daughter walking arm in arm down a path under a tunnel of blooming cherry blossom trees in spring in Korea, seen from behind and small in the frame, soft pink petals in the air, bright airy light.",
+   mo:"cherry blossom petals drifting down slowly, the two walking away together",
+   g:{t:"bokeh", grad:["#fbf4f3","#f3d2da","#b98d9e"], pal:["#f7c6d3","#fbe3ea","#f0a9bd","#fff4f7"]}},
+  {id:"canola", n:"제주 유채꽃 들판", season:["봄"], feel:["희망"], d:"노란 유채꽃밭 사이를 걷는 여성", people:true, mood:"hope", grade:"natural",
+   img:"A Korean woman in a white dress and straw hat walking through a vast field of yellow canola flowers on Jeju Island in spring, seen from behind and small in the frame, soft blue sky, distant gentle hills.",
+   mo:"canola flowers swaying in the breeze, the woman walking slowly, clouds drifting",
+   g:{sky:["#a9c8e6","#c9dcee","#e8f0f6"], cloud:{c:"255,255,255",amt:.6,lo:.15,hi:.55}, ground:{t:"field",y:.62,cols:["#f1e27a","#d9c13a","#8a7a1e"]}}},
+  {id:"flower", n:"작은 들꽃", season:["봄","사계절"], feel:["위로"], d:"분홍빛 흐림 속 파란 들꽃 한 송이 (인물 없음)", people:false, mood:"musicbox", grade:"calm",
+   img:"A single delicate small blue wildflower on a thin stem, extreme close-up macro, soft pink and cream bokeh background, dreamy pastel light. No people.",
+   mo:"the flower swaying very gently in a soft breeze, bokeh shimmering",
+   g:{t:"flower"}},
+  {id:"field", n:"안개 낀 보리밭", season:["봄"], feel:["위로"], d:"안개 낀 보리밭에서 휴대폰을 보는 청년의 뒷모습", people:true, mood:"pad", grade:"calm",
+   img:"A young Korean man with a backpack and a cap standing in a misty green barley field in the Korean countryside at dawn, seen from behind, looking down at his phone, soft fog, tall grass in the foreground.",
+   mo:"fog slowly drifting across the field, grass swaying in a light breeze",
+   g:{sky:["#f2f3ef","#e6eae3","#d4dbcf"], cloud:{c:"255,255,255",amt:.55,lo:.35,hi:.75}, ground:{t:"field",y:.62}}},
+  // ── 여름 ──
+  {id:"pinwheel", n:"바람개비 하늘", season:["여름"], feel:["희망"], d:"파란 하늘과 뭉게구름 (인물 없음)", people:false, mood:"hope", grade:"natural",
+   img:"A blue and white paper pinwheel held up against a bright blue summer sky with fluffy white clouds, low angle. No people visible.",
+   mo:"the pinwheel spinning slowly, clouds drifting",
+   g:{sky:["#3d7dc3","#6aa1da","#a7c9eb"], cloud:{c:"255,255,255",amt:1,lo:0,hi:1}, ground:{t:"none"}}},
+  // ── 가을 ──
+  {id:"autumnleaves", n:"가을 낙엽길", season:["가을"], feel:["그리움","사랑"], d:"붉은 단풍 낙엽길을 걷는 노부부", people:true, mood:"piano", grade:"warm",
+   img:"An elderly Korean couple walking slowly hand in hand along a park path covered with red and orange maple leaves in autumn in Korea, seen from behind and small in the frame, soft warm afternoon light, trees glowing.",
+   mo:"leaves falling slowly, the couple walking away step by step",
+   g:{t:"bokeh", grad:["#f4e9dd","#e9a97b","#7a3b22"], pal:["#e8743b","#c94f2c","#f2a65a","#f7d08a"]}},
+  {id:"ginkgo", n:"노란 은행나무길", season:["가을"], feel:["그리움"], d:"노란 은행잎이 지는 길을 걷는 여성", people:true, mood:"piano", grade:"warm",
    img:"A Korean woman in a beige trench coat walking away down a path lined with golden ginkgo trees in autumn in Korea, yellow leaves falling, warm afternoon sunlight, soft background blur.",
    mo:"yellow ginkgo leaves falling slowly, the woman walking away",
    g:{t:"bokeh"}},
-  {id:"hanok", n:"한옥 처마 아래 비", d:"비 오는 한옥 마루에 앉은 할머니", people:true, mood:"pad", grade:"calm",
-   img:"A Korean grandmother in a simple cardigan sitting on the wooden porch (maru) of a traditional Korean hanok, seen from the side, quiet rain falling from the tiled eaves, soft gray light, calm and nostalgic.",
-   mo:"rain dripping from the eaves, gentle steam rising from a teacup",
-   g:{sky:["#e7e8e7","#d9dbda","#c5c8c7"], cloud:{c:"255,255,255",amt:.5,lo:.2,hi:.8}, ground:{t:"ridge",y:.8,color:"#4a4e4d"}}},
+  {id:"reeds", n:"억새 언덕의 노을", season:["가을"], feel:["그리움","위로"], d:"황금빛 억새밭 언덕을 걷는 사람", people:true, mood:"night", grade:"warm",
+   img:"A Korean woman walking along a narrow path through a hillside of silver pampas grass (eoksae) in autumn in Korea at golden hour, seen from behind and small in the frame, the grass glowing in backlight, soft hazy sky.",
+   mo:"silver grass waving gently in the wind, the woman walking slowly",
+   g:{sky:["#f2e9dc","#efd6b4","#e3b88a"], cloud:{c:"255,240,220",amt:.3,lo:.05,hi:.45}, sun:{x:.6,y:.6,r:.45,c:"255,215,165"}, ground:{t:"field",y:.6,cols:["#ead6aa","#c9a66b","#7d6235"]}}},
+  {id:"rice", n:"황금 들녘", season:["가을"], feel:["희망","위로"], d:"익어가는 황금 논길을 걷는 시골 노부부", people:true, mood:"pad", grade:"warm",
+   img:"An elderly Korean farming couple walking along a narrow path between golden ripe rice paddies in the Korean countryside in autumn, seen from behind and small in the frame, soft clear sky, distant low mountains.",
+   mo:"rice stalks swaying in waves in the breeze, the couple walking slowly",
+   g:{sky:["#dbe8f2","#eef1e9","#f6eccb"], cloud:{c:"255,255,255",amt:.45,lo:.1,hi:.5}, ground:{t:"field",y:.62,cols:["#e8cf6c","#c9a43a","#7e6a22"]}}},
+  // ── 겨울 ──
+  {id:"firstsnow", n:"첫눈 오는 길", season:["겨울"], feel:["사랑","그리움"], d:"첫눈이 내리는 조용한 길을 함께 걷는 연인", people:true, mood:"musicbox", grade:"calm",
+   img:"A young Korean couple in winter coats walking close together down a quiet tree-lined street as the first snow falls in Korea, seen from behind and small in the frame, soft white-gray sky, warm street lights glowing faintly.",
+   mo:"snowflakes falling softly, the couple walking away slowly",
+   g:{sky:["#eeeff1","#e3e5e8","#d5d8dc"], cloud:{c:"255,255,255",amt:.4,lo:.1,hi:.6}, ground:{t:"snow",y:.7}, snow:true}},
 ];
 
 const SAMPLES = [
@@ -374,7 +457,7 @@ const MUSIC = {
 const S = {text:SAMPLES[0].t, author:SAMPLES[0].a, source:SAMPLES[0].s, brand:"강산부동산",
   scene:"beach", font:FONTS[0].f, anim:"write", motion:"in", grade:"scene", haze:.32, grain:.07, ink:"auto",
   size:1, asize:1, lh:1, pos:"top", focusY:.6, ratio:"9:16", dur:10, music:"auto", vol:.7, fadeOut:false, q:1, bg:"ai"};
-const SAVE_KEYS = ["text","author","source","brand","scene","font","anim","motion","grade","haze","grain","ink","size","asize","lh","pos","ratio","dur","music","vol","fadeOut","q"];
+const SAVE_KEYS = ["fSeason","fFeel","veo","text","author","source","brand","scene","font","anim","motion","grade","haze","grain","ink","size","asize","lh","pos","ratio","dur","music","vol","fadeOut","q"];
 try { const saved = JSON.parse(localStorage.getItem("gyv-state") || "null"); if (saved) for (const k of SAVE_KEYS) if (k in saved) S[k] = saved[k]; } catch(e) {}
 let saveT = 0;
 function persist(){ clearTimeout(saveT); saveT = setTimeout(() => { try { const o = {}; SAVE_KEYS.forEach(k => o[k] = S[k]); localStorage.setItem("gyv-state", JSON.stringify(o)); } catch(e) {} }, 400); }
@@ -396,6 +479,7 @@ function makeNoise(seed){ const R = rng(seed), P = new Float32Array(65536); for 
     return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v; };
   return (x,y,o=5) => { let s=0,amp=1,f=1,norm=0; for(let i=0;i<o;i++){ s+=amp*n(x*f+i*17.3,y*f+i*9.1); norm+=amp; amp*=.5; f*=2; } return s/norm; };
 }
+function hex2rgb(h){ const n=parseInt(h.slice(1),16); return [n>>16&255,n>>8&255,n&255]; }
 function blurDraw(g, img, x, y, w, h, px){ if (FILTER_OK && px > 0) { g.filter = `blur(${px}px)`; } g.drawImage(img, x, y, w, h); if (FILTER_OK) g.filter = "none"; }
 function skyGrad(g, W, H, cols, to){ const gr = g.createLinearGradient(0,0,0,to); cols.forEach((c,i)=>gr.addColorStop(i/(cols.length-1), c)); g.fillStyle = gr; g.fillRect(0,0,W,to); }
 function clouds(g, W, H, cl, seed, bottom){
@@ -420,9 +504,10 @@ function genScene(sc, W, H){
     return c;
   }
   if (G.t === "bokeh"){
-    const gr=g.createLinearGradient(0,0,0,H); gr.addColorStop(0,"#f5ecd0"); gr.addColorStop(.45,"#ecc76d"); gr.addColorStop(1,"#8d6b25"); g.fillStyle=gr; g.fillRect(0,0,W,H);
-    for (let i=0;i<70;i++){ const x=R()*W, y=H*(.35+R()*.65), r=W*(.015+R()*.07); g.save(); if (FILTER_OK) g.filter=`blur(${r*.25}px)`; g.globalAlpha=.15+R()*.35; g.fillStyle=["#ffe08a","#f5c542","#fff2c2","#e6a730"][i%4]; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); g.restore(); }
-    const top=g.createLinearGradient(0,0,0,H*.5); top.addColorStop(0,"rgba(250,244,226,.85)"); top.addColorStop(1,"rgba(250,244,226,0)"); g.fillStyle=top; g.fillRect(0,0,W,H*.5);
+    const GD=G.grad||["#f5ecd0","#ecc76d","#8d6b25"], PAL=G.pal||["#ffe08a","#f5c542","#fff2c2","#e6a730"];
+    const gr=g.createLinearGradient(0,0,0,H); gr.addColorStop(0,GD[0]); gr.addColorStop(.45,GD[1]); gr.addColorStop(1,GD[2]); g.fillStyle=gr; g.fillRect(0,0,W,H);
+    for (let i=0;i<70;i++){ const x=R()*W, y=H*(.35+R()*.65), r=W*(.015+R()*.07); g.save(); if (FILTER_OK) g.filter=`blur(${r*.25}px)`; g.globalAlpha=.15+R()*.35; g.fillStyle=PAL[i%PAL.length]; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); g.restore(); }
+    const [tr,tg,tb]=hex2rgb(GD[0]); const top=g.createLinearGradient(0,0,0,H*.5); top.addColorStop(0,`rgba(${tr},${tg},${tb},.85)`); top.addColorStop(1,`rgba(${tr},${tg},${tb},0)`); g.fillStyle=top; g.fillRect(0,0,W,H*.5);
     return c;
   }
   const gy = G.ground.t === "none" ? H : H*G.ground.y;
@@ -440,8 +525,9 @@ function genScene(sc, W, H){
     const hz=g.createLinearGradient(0,gy-H*.02,0,gy+H*.04); hz.addColorStop(0,"rgba(255,255,255,0)"); hz.addColorStop(.5,"rgba(255,255,255,.35)"); hz.addColorStop(1,"rgba(255,255,255,0)"); g.fillStyle=hz; g.fillRect(0,gy-H*.02,W,H*.06);
   } else if (T === "field"){
     ridge(g,W,H,gy,H*.03,"rgba(120,135,118,.55)",3);
-    const gr=g.createLinearGradient(0,gy,0,H); gr.addColorStop(0,"#a7b897"); gr.addColorStop(.5,"#6c8757"); gr.addColorStop(1,"#3c5630"); g.fillStyle=gr; g.fillRect(0,gy+H*.01,W,H);
-    for (let i=0;i<2600;i++){ const y=gy+(H-gy)*Math.pow(R(),.8); const d=(y-gy)/(H-gy); g.strokeStyle=`rgba(${30+R()*40|0},${60+R()*50|0},${25+R()*30|0},${.25+d*.5})`; g.lineWidth=1+d*W*.003; const x=R()*W, l=H*(.004+d*.05); g.beginPath(); g.moveTo(x,y); g.lineTo(x+(R()-.5)*l*.4,y-l); g.stroke(); }
+    const FC=G.ground.cols||["#a7b897","#6c8757","#3c5630"]; const [cr,cg,cb]=hex2rgb(FC[2]);
+    const gr=g.createLinearGradient(0,gy,0,H); gr.addColorStop(0,FC[0]); gr.addColorStop(.5,FC[1]); gr.addColorStop(1,FC[2]); g.fillStyle=gr; g.fillRect(0,gy+H*.01,W,H);
+    for (let i=0;i<2600;i++){ const y=gy+(H-gy)*Math.pow(R(),.8); const d=(y-gy)/(H-gy); g.strokeStyle=`rgba(${cr*.7+R()*40|0},${cg*.7+R()*40|0},${cb*.7+R()*30|0},${.25+d*.5})`; g.lineWidth=1+d*W*.003; const x=R()*W, l=H*(.004+d*.05); g.beginPath(); g.moveTo(x,y); g.lineTo(x+(R()-.5)*l*.4,y-l); g.stroke(); }
     const fog=g.createLinearGradient(0,gy-H*.08,0,gy+H*.14); fog.addColorStop(0,"rgba(240,243,238,0)"); fog.addColorStop(.45,"rgba(240,243,238,.75)"); fog.addColorStop(1,"rgba(240,243,238,0)"); g.fillStyle=fog; g.fillRect(0,gy-H*.08,W,H*.22);
   } else if (T === "ridge"){
     ridge(g,W,H,gy-H*.04,H*.05,"rgba(120,120,120,.35)",11);
@@ -464,6 +550,18 @@ function genScene(sc, W, H){
     g.fillStyle="rgba(10,10,20,.4)"; g.fillRect(0,wy,W,H-wy);
     g.strokeStyle="rgba(255,255,255,.12)"; g.lineWidth=W*.002; for(let i=1;i<7;i++){ g.beginPath(); g.ellipse(W*.4,wy+(H-wy)*.55,W*.06*i,H*.008*i,0,0,7); g.stroke(); }
   }
+  if (T === "snow"){
+    ridge(g,W,H,gy-H*.03,H*.05,"#c4d0dc",41); ridge(g,W,H,gy,H*.06,"#eef2f6",42,true);
+    const sg=g.createLinearGradient(0,gy,0,H); sg.addColorStop(0,"rgba(214,224,234,.0)"); sg.addColorStop(1,"rgba(200,212,226,.8)"); g.fillStyle=sg; g.fillRect(0,gy,W,H-gy);
+    for (let i=0;i<40;i++){ const x=R()*W, y=gy+(H-gy)*(.1+R()*.5), h=H*(.015+R()*.03); g.fillStyle="rgba(60,72,70,.55)"; g.beginPath(); g.moveTo(x,y-h); g.lineTo(x-h*.35,y); g.lineTo(x+h*.35,y); g.closePath(); g.fill(); }
+  }
+  if (G.boat){ const bx=W*.5, by=gy+(H-gy)*.32, bw=W*.2;
+    g.fillStyle="rgba(40,44,44,.85)"; g.beginPath(); g.moveTo(bx-bw/2,by); g.quadraticCurveTo(bx,by+H*.018,bx+bw/2,by); g.lineTo(bx+bw*.42,by+H*.006); g.quadraticCurveTo(bx,by+H*.02,bx-bw*.42,by+H*.006); g.closePath(); g.fill();
+    g.fillRect(bx+bw*.15,by-H*.03,W*.012,H*.03); g.beginPath(); g.arc(bx+bw*.155+W*.006,by-H*.034,W*.009,0,7); g.fill();
+    g.strokeStyle="rgba(40,44,44,.7)"; g.lineWidth=W*.004; g.beginPath(); g.moveTo(bx+bw*.17,by-H*.02); g.lineTo(bx+bw*.45,by+H*.025); g.stroke();
+    g.fillStyle="rgba(40,44,44,.18)"; g.fillRect(bx-bw*.45,by+H*.016,bw*.9,H*.01); }
+  if (G.rain){ g.strokeStyle="rgba(235,240,240,.35)"; g.lineWidth=Math.max(1,W*.0015); for (let i=0;i<700;i++){ const x=R()*W, y=R()*H, l=H*(.015+R()*.035); g.globalAlpha=.3+R()*.5; g.beginPath(); g.moveTo(x,y); g.lineTo(x-l*.12,y+l); g.stroke(); } g.globalAlpha=1; }
+  if (G.snow){ for (let i=0;i<420;i++){ const r=W*(.001+R()*.004); g.fillStyle=`rgba(255,255,255,${.5+R()*.45})`; g.beginPath(); g.arc(R()*W,R()*H,r,0,7); g.fill(); } }
   if (G.mono){ const d=g.getImageData(0,0,W,H); for(let i=0;i<d.data.length;i+=4){ const l=d.data[i]*.3+d.data[i+1]*.59+d.data[i+2]*.11; d.data[i]=d.data[i+1]=d.data[i+2]=l; } g.putImageData(d,0,0); }
   return c;
 }
@@ -839,7 +937,12 @@ function autoBreak(text){ const words = text.replace(/\s*\n\s*/g, " ").trim().sp
   const n = Math.max(1, Math.round(total / 14)); const target = total / n; const lines = []; let cur = "";
   words.forEach(w => { const t = cur ? cur + " " + w : w; if (cur && t.length > target * 1.2) { lines.push(cur); cur = w; } else cur = t; if (/[,.!?…]$/.test(cur) && cur.length > target * .6) { lines.push(cur); cur = ""; } });
   if (cur) lines.push(cur); return lines.join("\n"); }
-const HINTS = [["beach",/바다|파도|노을|해변|산책|함께/],["whale",/고래|칭찬|아첨/],["summit",/정상|능력|인격|산|오르/],["pinwheel",/바람|달려|앞으로|희망/],["flower",/꽃|작은|피어|봄/],["lake",/여행|탐험|풍경|눈으로|새로운/],["ginkgo",/가을|세월|추억|낙엽|기다/],["hanok",/어머니|엄마|고향|할머니|비|그리움/],["city",/흔들|독해|약속|도시|밤/],["hill",/변화|서로|사람들|함께|관계/],["pier",/듣|대화|이해|말/],["field",/쉼|충전|지치|배터리|슬럼프|천천히/]];
+const HINTS = [["beach",/노을|해변|산책/],["beachrun",/달려|달리|뛰|도전|포기/],["sunrise",/새해|일출|해돋이|시작|아침/],["pier",/듣|대화|이해|말/],["wintersea",/외로|혼자|견디|버티/],["tidal",/아버지|아빠|자식|아이/],["whale",/고래|칭찬|아첨/],
+  ["ferry",/강|건너|세월|흘러/],["lakemist",/고요|침묵|마음|비우/],["lakebench",/친구|곁에|함께|동행|부부/],["lake",/여행|탐험|풍경|새로운/],["hill",/변화|서로|사람들|관계/],
+  ["hikeclouds",/오르|올라|한 걸음|걸음|노력/],["summit",/정상|능력|인격|성공/],["snowtrail",/겨울|추위|시련|고난|눈길/],["temple",/평화|욕심|내려놓|비움|수행/],["city",/흔들|독해|약속|도시|밤/],
+  ["eaves",/비가|빗방울|쉬어|쉼표/],["hanok",/할머니|어머니|엄마|고향|그리움/],["hanokvillage",/추억|옛|골목|비 오는/],
+  ["cherry",/봄|벚꽃|딸|엄마와/],["canola",/희망|꿈|설레/],["flower",/꽃|작은|피어/],["field",/충전|지치|배터리|슬럼프|천천히/],["pinwheel",/바람|앞으로|여름/],
+  ["autumnleaves",/가을|단풍|낙엽|노년|늙/],["ginkgo",/기다|은행/],["reeds",/저녁|황혼|인생/],["rice",/감사|수확|땀|결실|익/],["firstsnow",/첫눈|사랑|연인|설렘/]];
 function suggestScene(){ const t = S.text + " " + S.source; let best = null, sc = 0; HINTS.forEach(([id, re]) => { const m = (t.match(new RegExp(re.source, "g")) || []).length; if (m > sc) { sc = m; best = id; } });
   if (!best) best = SCENES[(S.text.length * 7) % SCENES.length].id; selectScene(best); setStatus(`'${sceneOf(best).n}' 장면을 추천했어요.`, "ok"); }
 
@@ -884,7 +987,19 @@ fontsEl.onclick = e => { const b = e.target.closest(".chip"); if (!b) return; S.
 // 장면 카드
 const scenesEl = $("#scenes");
 SCENES.forEach(sc => { const b = document.createElement("button"); b.type = "button"; b.className = "scene"; b.dataset.v = sc.id;
-  const c = document.createElement("canvas"); c.width = 90; c.height = 160; b.appendChild(c); const sp = document.createElement("span"); sp.textContent = sc.n + (sc.people ? "" : " ·풍경"); b.appendChild(sp); scenesEl.appendChild(b); });
+  const c = document.createElement("canvas"); c.width = 90; c.height = 160; b.appendChild(c); const sp = document.createElement("span"); sp.textContent = sc.n; b.appendChild(sp);
+  const em = document.createElement("em"); em.textContent = [sc.season.join("·"), sc.feel.join("·"), sc.people ? "" : "풍경"].filter(Boolean).join(" | "); b.appendChild(em); scenesEl.appendChild(b); });
+// 계절 · 느낌 필터
+const F_SEASON = [["all","전체 계절"],["봄","봄"],["여름","여름"],["가을","가을"],["겨울","겨울"]];
+const F_FEEL = [["all","모든 느낌"],["평온","평온"],["희망","희망"],["위로","위로"],["그리움","그리움"],["사랑","사랑"],["도전","도전"]];
+S.fSeason = S.fSeason || "all"; S.fFeel = S.fFeel || "all";
+function applyFilter(){ let n = 0; scenesEl.querySelectorAll(".scene").forEach((b, i) => { const sc = SCENES[i];
+    const ok = (S.fSeason === "all" || sc.season.includes(S.fSeason) || sc.season.includes("사계절")) && (S.fFeel === "all" || sc.feel.includes(S.fFeel));
+    b.hidden = !ok; if (ok) n++; });
+  $("#sceneCount").textContent = `${SCENES.length}가지 중 ${n}개 · 인물은 모두 한국인으로 생성`; }
+segment($("#seasonSeg"), F_SEASON, "fSeason", applyFilter);
+segment($("#feelSeg"), F_FEEL, "fFeel", applyFilter);
+applyFilter();
 function drawThumbs(){ scenesEl.querySelectorAll(".scene").forEach((b, i) => { const c = b.querySelector("canvas"); const g = c.getContext("2d"); const sc = SCENES[i];
   g.drawImage(genScene(sc, 90, 160), 0, 0); if (FILTER_OK){ const t = document.createElement("canvas"); t.width=90; t.height=160; const tg = t.getContext("2d"); tg.filter = GRADE_FILTER[sc.grade]; tg.drawImage(c,0,0); g.clearRect(0,0,90,160); g.drawImage(t,0,0); } }); }
 function syncScenes(){ scenesEl.querySelectorAll(".scene").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === S.scene))); }
