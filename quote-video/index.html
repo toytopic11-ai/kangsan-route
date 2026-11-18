@@ -78,6 +78,17 @@ input[type=range]{accent-color:var(--accent);width:100%}
 .cands button{padding:0;border:2px solid transparent;border-radius:10px;background:none;cursor:pointer;overflow:hidden;min-width:0}
 .cands img{display:block;width:100%;aspect-ratio:9/16;object-fit:cover}
 .cands button[aria-pressed=true]{border-color:var(--accent)}
+.lib-list{display:flex;flex-direction:column;gap:8px;max-height:440px;overflow:auto;padding-right:2px}
+.lib-item{border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.lib-item.used{opacity:.72}
+.lib-item p{margin:0;font-family:var(--serif);white-space:pre-line;line-height:1.5;font-size:15px}
+.lib-item .meta{font-size:12px;color:var(--muted)}
+.lib-item .acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.badge{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted)}
+.badge.used{color:var(--ok);border-color:var(--ok)}
+.badge.warn{color:var(--warn);border-color:var(--warn)}
+.lib-empty{color:var(--muted);font-size:13px;padding:14px;border:1px dashed var(--line);border-radius:12px;text-align:center}
+.sub{display:flex;flex-direction:column;gap:10px;margin-top:10px}
 .prompt{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:110px}
 details summary{cursor:pointer;color:var(--muted);font-size:13px}
 .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg)}
@@ -111,11 +122,73 @@ footer{color:var(--muted);font-size:12px;text-align:center}
     </section>
 
     <section class="controls" aria-label="설정">
+      <div class="panel" id="libPanel">
+        <h2><span>글감 창고</span><small id="libCount"></small></h2>
+        <div class="seg" id="libCatSeg" role="group" aria-label="글 분류"></div>
+        <div class="seg" id="libFeelSeg" role="group" aria-label="느낌"></div>
+        <div class="row">
+          <label class="f">상태
+            <select id="libStatus"><option value="unused">아직 안 만든 글</option><option value="used">이미 만든 글</option><option value="all">전체</option></select>
+          </label>
+          <label class="f">검색 <input type="text" id="libSearch" placeholder="단어·저자·작품명"></label>
+        </div>
+        <div class="tabs">
+          <button class="btn small" id="libPick" type="button">오늘의 글 뽑기</button>
+          <label class="check"><input type="checkbox" id="libAutoScene" checked> 글을 고르면 어울리는 장면도 자동 선택</label>
+        </div>
+        <div class="lib-list" id="libList"></div>
+
+        <details>
+          <summary>AI로 글감 추천받기 (Gemini 키 사용 · 1회 몇 원)</summary>
+          <div class="sub">
+            <div class="row">
+              <label class="f">주제 <input type="text" id="aiTopic" placeholder="예) 인간관계, 버티는 힘, 부모님, 가을"></label>
+              <label class="f">분류
+                <select id="aiCat"><option value="골고루">골고루</option><option value="책">책 속 한 줄</option><option value="드라마">드라마·영화 명대사</option><option value="동기부여">유명인 동기부여</option><option value="좋은글">좋은 글</option></select>
+              </label>
+            </div>
+            <button class="btn small" id="aiSuggest" type="button">후보 10개 받기</button>
+            <p class="status" id="libAiMsg" style="text-align:left"></p>
+            <p class="hint">고전 명언(공자·노자·속담 등)은 제외하고 받습니다. AI도 출처를 틀릴 수 있어 '출처 확인 필요' 표시가 붙은 글은 직접 확인 후 쓰세요.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>직접 추가하기</summary>
+          <div class="sub">
+            <label class="f">본문 (Enter로 줄 나눔) <textarea id="addText" rows="3"></textarea></label>
+            <div class="row">
+              <label class="f">저자 <input type="text" id="addAuthor"></label>
+              <label class="f">출처·작품 <input type="text" id="addSource" placeholder="<책 제목> / 드라마 〈제목〉"></label>
+            </div>
+            <div class="row">
+              <label class="f">분류 <select id="addCat"><option value="책">책 속 한 줄</option><option value="드라마">드라마·영화</option><option value="동기부여">유명인 동기부여</option><option value="좋은글">좋은 글</option></select></label>
+              <label class="f">느낌 <select id="addFeel"><option value="">선택 안 함</option><option>평온</option><option>희망</option><option>위로</option><option>그리움</option><option>사랑</option><option>도전</option></select></label>
+            </div>
+            <button class="btn small" id="addBtn" type="button">창고에 추가</button>
+            <p class="status" id="addMsg" style="text-align:left"></p>
+          </div>
+        </details>
+
+        <details>
+          <summary>구글 시트에서 가져오기 · 백업</summary>
+          <div class="sub">
+            <p class="hint">구글 시트에서 <b>본문 | 저자 | 출처 | 분류 | 느낌</b> 순서의 칸을 드래그해 복사한 뒤 아래에 붙여 넣으세요. CSV 파일(파일 → 다운로드 → CSV)도 됩니다. 이미 있는 글은 자동으로 건너뜁니다.</p>
+            <textarea id="importText" rows="4" placeholder="여기에 붙여넣기"></textarea>
+            <div class="tabs">
+              <button class="btn small" id="importBtn" type="button">붙여넣은 글 추가</button>
+              <label class="btn small" style="cursor:pointer">CSV 파일 선택<input type="file" id="importFile" accept=".csv,.tsv,.txt,text/csv" hidden></label>
+              <button class="btn small" id="exportBtn" type="button">창고 전체 CSV로 백업</button>
+            </div>
+            <p class="status" id="importMsg" style="text-align:left"></p>
+            <p class="note">글감 창고는 이 기기의 브라우저에 저장됩니다. 다른 기기에서 쓰거나 브라우저 기록을 지우기 전에는 CSV로 백업해 두세요.</p>
+          </div>
+        </details>
+      </div>
+
       <div class="panel">
         <h2><span><span class="step">1</span>글 넣기</span><small>Enter로 줄을 나누면 그 줄 단위로 나타나요</small></h2>
-        <label class="f">추천 글 불러오기
-          <select id="sample"></select>
-        </label>
+        <p class="status" id="dupNote" style="text-align:left;min-height:0"></p>
         <label class="f">본문
           <textarea id="text" rows="5"></textarea>
         </label>
@@ -436,13 +509,16 @@ const SCENES = [
    g:{sky:["#eeeff1","#e3e5e8","#d5d8dc"], cloud:{c:"255,255,255",amt:.4,lo:.1,hi:.6}, ground:{t:"snow",y:.7}, snow:true}},
 ];
 
+// 글감 창고 기본 예시 (고전 명언 제외 · 출처가 널리 확인된 현대 글만, 번역은 의역)
 const SAMPLES = [
-  {t:"하루라도 책을 읽지 않으면\n입 안에 가시가 돋는다", a:"안중근", s:"독립운동가"},
-  {t:"죽고자 하면 살 것이요\n살고자 하면 죽을 것이다", a:"이순신", s:"<난중일기>"},
-  {t:"배우고 때때로 익히면\n또한 기쁘지 아니한가", a:"공자", s:"<논어>"},
-  {t:"천 리 길도\n발밑에서 시작된다", a:"노자", s:"<도덕경>"},
-  {t:"서두르지 말라\n그러나 멈추지도 말라", a:"괴테", s:"독일 작가"},
-  {t:"가는 말이 고와야\n오는 말이 곱다", a:"", s:"우리 속담"},
+  {t:"대부분의 사람들은\n이해하려는 의도로 듣지 않고\n대답하려는 의도로 듣는다", a:"스티븐 코비", s:"<성공하는 사람들의 7가지 습관>", c:"책", f:"사랑"},
+  {t:"가장 중요한 것은\n눈에 보이지 않아", a:"생텍쥐페리", s:"<어린 왕자>", c:"책", f:"그리움"},
+  {t:"네가 네 장미에게 쏟은 시간 때문에\n네 장미가 그토록 소중해진 거야", a:"생텍쥐페리", s:"<어린 왕자>", c:"책", f:"사랑"},
+  {t:"모든 것을 빼앗겨도\n단 하나, 어떤 태도를 취할지\n선택할 자유만은 빼앗을 수 없다", a:"빅터 프랭클", s:"<죽음의 수용소에서>", c:"책", f:"위로"},
+  {t:"진정한 발견의 여정은\n새로운 풍경을 찾는 것이 아니라\n새로운 눈을 갖는 것이다", a:"마르셀 프루스트", s:"프랑스 작가", c:"책", f:"희망"},
+  {t:"인생의 점들은 앞을 내다보며\n이을 수 없다\n오직 뒤돌아볼 때만 이어진다", a:"스티브 잡스", s:"2005 스탠퍼드 졸업 연설", c:"동기부여", f:"희망"},
+  {t:"늘 갈망하라\n우직하게 나아가라", a:"스티브 잡스", s:"2005 스탠퍼드 졸업 연설", c:"동기부여", f:"도전"},
+  {t:"나는 실패하고 또 실패했다\n그것이 내가\n성공한 이유다", a:"마이클 조던", s:"농구 선수", c:"동기부여", f:"도전"},
 ];
 
 const ANIMS = [["write","손글씨 쓰듯"],["fadeup","아래서 떠오르기"],["fade","서서히"],["blur","흐림→선명"],["type","한 글자씩"],["all","전체 한 번에"]];
@@ -455,7 +531,7 @@ const MUSIC = {
 };
 
 /* ---------------- 상태 ---------------- */
-const S = {text:SAMPLES[0].t, author:SAMPLES[0].a, source:SAMPLES[0].s, brand:"강산부동산",
+const S = {text:SAMPLES[0].t, author:SAMPLES[0].a, source:SAMPLES[0].s, brand:"강산부동산", libCat:"all", libFeel:"all",
   scene:"beach", font:FONTS[0].f, anim:"write", motion:"in", grade:"scene", haze:.32, grain:.07, ink:"auto",
   size:1, asize:1, lh:1, pos:"top", focusY:.6, ratio:"9:16", dur:10, music:"auto", vol:.7, fadeOut:false, q:1, bg:"ai"};
 const SAVE_KEYS = ["fSeason","fFeel","veo","text","author","source","brand","scene","font","anim","motion","grade","haze","grain","ink","size","asize","lh","pos","ratio","dur","music","vol","fadeOut","q"];
@@ -830,6 +906,7 @@ async function makeVideo(){
   recording = false; btn.disabled = false; setScale(.5); lineCache.clear(); showTime(restT()); drawStill();
   const type = (rec.mimeType || mime || "video/webm").split(";")[0]; const ext = type.includes("mp4") ? "mp4" : "webm";
   const blob = new Blob(chunks, {type}); const d = new Date(); const pad = n => String(n).padStart(2, "0");
+  markUsed();
   lastBlob = blob; lastName = `글영상_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.${ext}`;
   const box = $("#result"); box.innerHTML = ""; const v = document.createElement("video"); v.src = URL.createObjectURL(blob); v.controls = true; v.playsInline = true; box.appendChild(v);
   const again = document.createElement("button"); again.className = "btn small"; again.type = "button"; again.textContent = "이 영상 다시 저장하기"; again.onclick = () => save(); box.appendChild(again); box.hidden = false;
@@ -964,8 +1041,8 @@ const HINTS = [["beach",/노을|해변|산책/],["beachrun",/달려|달리|뛰|�
   ["eaves",/비가|빗방울|쉬어|쉼표/],["hanok",/할머니|어머니|엄마|고향|그리움/],["hanokvillage",/추억|옛|골목|비 오는/],
   ["cherry",/봄|벚꽃|딸|엄마와/],["canola",/희망|꿈|설레/],["flower",/꽃|작은|피어/],["field",/충전|지치|배터리|슬럼프|천천히/],["pinwheel",/바람|앞으로|여름/],
   ["autumnleaves",/가을|단풍|낙엽|노년|늙/],["ginkgo",/기다|은행/],["reeds",/저녁|황혼|인생/],["rice",/감사|수확|땀|결실|익/],["firstsnow",/첫눈|사랑|연인|설렘/]];
-function suggestScene(){ const t = S.text + " " + S.source; let best = null, sc = 0; HINTS.forEach(([id, re]) => { const m = (t.match(new RegExp(re.source, "g")) || []).length; if (m > sc) { sc = m; best = id; } });
-  if (!best) best = SCENES[(S.text.length * 7) % SCENES.length].id; selectScene(best); setStatus(`'${sceneOf(best).n}' 장면을 추천했어요.`, "ok"); }
+function suggestScene(silent){ const t = S.text + " " + S.source; let best = null, sc = 0; HINTS.forEach(([id, re]) => { const m = (t.match(new RegExp(re.source, "g")) || []).length; if (m > sc) { sc = m; best = id; } });
+  if (!best) best = SCENES[(S.text.length * 7) % SCENES.length].id; selectScene(best); if (silent !== true) setStatus(`'${sceneOf(best).n}' 장면을 추천했어요.`, "ok"); }
 
 /* ---------------- UI 구성 ---------------- */
 function segment(el, items, key, onChange){ el.innerHTML = ""; items.forEach(([v, label]) => { const b = document.createElement("button"); b.type = "button"; b.dataset.v = v; b.textContent = label; el.appendChild(b); }); bindSeg(el, key, onChange); }
@@ -985,13 +1062,11 @@ function showBgTab(user){ ["ai","upload","scene"].forEach(k => $("#tab-" + k).hi
 
 const sel = $("#music"); Object.entries(MUSIC).forEach(([k, v]) => { const o = document.createElement("option"); o.value = k; o.textContent = v; sel.appendChild(o); });
 sel.value = S.music; sel.onchange = () => { S.music = sel.value; userMusic = null; $("#musicFile").value = ""; persist(); if (playing){ stop(); play(); } };
-const sm = $("#sample"); [["", "— 고전 명언 예시 고르기 —"], ...SAMPLES.map((s, i) => [i, `${s.t.replace(/\n/g, " ")} · ${s.a || s.s}`])].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; sm.appendChild(o); });
-sm.onchange = () => { if (sm.value === "") return; const s = SAMPLES[+sm.value]; S.text = s.t; S.author = s.a; S.source = s.s; syncInputs(); refresh(true); persist(); };
 
 function syncInputs(){ $("#text").value = S.text; $("#author").value = S.author; $("#source").value = S.source; $("#brand").value = S.brand; }
 [["text","text"],["author","author"],["source","source"],["brand","brand"]].forEach(([id, k]) => $("#" + id).addEventListener("input", e => { S[k] = e.target.value; persist(); fontsReady().then(() => refresh()); }));
 $("#autoBreak").onclick = () => { S.text = autoBreak(S.text); syncInputs(); refresh(true); persist(); };
-$("#suggest").onclick = suggestScene;
+$("#suggest").onclick = () => suggestScene(false);
 
 const sliders = [["size",v=>Math.round(v*100)+"%"],["asize",v=>Math.round(v*100)+"%"],["lh",v=>Math.round(v*100)+"%"],["haze",v=>Math.round(v*100)+"%"],["grain",v=>Math.round(v*100)+"%"],["vol",v=>Math.round(v*100)+"%"],["focusY",v=>Math.round(v*100)+"%"]];
 sliders.forEach(([k, fmt]) => { const el = $("#" + k), out = $("#" + k + "o"); el.value = S[k]; out.textContent = fmt(S[k]);
@@ -1033,6 +1108,145 @@ function applyRatio(){ const [w, h] = RATIOS[S.ratio]; FW = w; FH = h; stop(); s
 let rT = 0;
 function refresh(resetTime){ layoutKey = ""; if (resetTime && !playing) showTime(restT()); cancelAnimationFrame(rT); rT = requestAnimationFrame(() => { if (!playing && !recording) drawStill(); }); }
 if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", () => { lineCache.clear(); layoutKey = ""; refresh(); });
+
+/* ---------------- 글감 창고 ---------------- */
+const LIB_KEY = "gyv-lib";
+const LIB_CATS = [["all","전체"],["책","책 속 한 줄"],["드라마","드라마·영화"],["동기부여","동기부여"],["좋은글","좋은 글"]];
+const CAT_LABEL = {"책":"책","드라마":"드라마·영화","동기부여":"동기부여","좋은글":"좋은 글"};
+const TXT_MODELS = ["gemini-flash-latest","gemini-3.5-flash","gemini-2.5-flash"];
+let LIB = [];
+const normT = t => String(t || "").replace(/[\s\p{P}\p{S}]/gu, "");
+function newId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function saveLib(){ try { localStorage.setItem(LIB_KEY, JSON.stringify(LIB)); } catch(e){} }
+try { const raw = localStorage.getItem(LIB_KEY); if (raw) LIB = JSON.parse(raw) || []; } catch(e){ LIB = []; }
+if (!LIB.length) LIB = SAMPLES.map(x => ({id:newId(), t:x.t, a:x.a, s:x.s, c:x.c, f:x.f, ex:true, used:null, uses:0, added:Date.now()}));
+function findItem(t){ const n = normT(t); return n ? LIB.find(x => normT(x.t) === n) : null; }
+function addItem(o){
+  const t = String(o.t || "").replace(/\r/g, "").trim(); if (!normT(t)) return {added:false};
+  const ex = findItem(t); if (ex) return {added:false, dup:true, item:ex};
+  const it = {id:newId(), t, a:(o.a||"").trim(), s:(o.s||"").trim(), c: CAT_LABEL[o.c] ? o.c : "좋은글", f:(o.f||"").trim(), ai:!!o.ai, unverified:!!o.unverified, ex:false, used:null, uses:0, added:Date.now()};
+  LIB.unshift(it); return {added:true, item:it};
+}
+const fmtDate = ms => { const d = new Date(ms); return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`; };
+function libFiltered(){
+  const st = $("#libStatus").value, q = $("#libSearch").value.trim().toLowerCase();
+  return LIB.filter(x => (S.libCat === "all" || x.c === S.libCat) && (S.libFeel === "all" || x.f === S.libFeel)
+    && (st === "all" || (st === "used" ? !!x.used : !x.used))
+    && (!q || (x.t + " " + x.a + " " + x.s).toLowerCase().includes(q)));
+}
+function renderLib(){
+  const list = libFiltered(), box = $("#libList"); box.innerHTML = "";
+  const used = LIB.filter(x => x.used).length;
+  $("#libCount").textContent = `전체 ${LIB.length}개 · 만든 글 ${used}개 · 표시 ${list.length}개`;
+  if (!list.length){ const d = document.createElement("div"); d.className = "lib-empty"; d.textContent = LIB.length ? "조건에 맞는 글이 없어요. 필터를 바꾸거나 AI 추천·직접 추가로 글을 채워 보세요." : "아직 글이 없어요. 아래 'AI로 글감 추천받기'나 '직접 추가하기'로 시작하세요."; box.appendChild(d); return; }
+  list.slice(0, 80).forEach(x => {
+    const el = document.createElement("div"); el.className = "lib-item" + (x.used ? " used" : "");
+    const p = document.createElement("p"); p.textContent = x.t; el.appendChild(p);
+    const meta = document.createElement("div"); meta.className = "meta"; meta.textContent = [x.a, x.s].filter(Boolean).join(" · ") || "저자 미입력"; el.appendChild(meta);
+    const acts = document.createElement("div"); acts.className = "acts";
+    const badge = (txt, cls) => { const b = document.createElement("span"); b.className = "badge" + (cls ? " " + cls : ""); b.textContent = txt; acts.appendChild(b); };
+    badge(CAT_LABEL[x.c] || "좋은 글"); if (x.f) badge(x.f);
+    if (x.unverified) badge("출처 확인 필요", "warn"); else if (x.ai) badge("AI 추천");
+    if (x.ex) badge("예시");
+    if (x.used) badge(`${fmtDate(x.used)} 제작${x.uses > 1 ? ` · ${x.uses}회` : ""}`, "used");
+    const use = document.createElement("button"); use.type = "button"; use.className = "btn small"; use.textContent = "이 글로 만들기"; use.onclick = () => loadItem(x); acts.appendChild(use);
+    const del = document.createElement("button"); del.type = "button"; del.className = "btn small"; del.textContent = "삭제";
+    del.onclick = () => { if (del.dataset.armed){ LIB = LIB.filter(y => y.id !== x.id); saveLib(); renderLib(); } else { del.dataset.armed = "1"; del.textContent = "한 번 더 누르면 삭제"; setTimeout(() => { if (del.isConnected){ delete del.dataset.armed; del.textContent = "삭제"; } }, 3000); } };
+    acts.appendChild(del); el.appendChild(acts); box.appendChild(el);
+  });
+}
+function loadItem(x){
+  stop(); S.text = x.t; S.author = x.a; S.source = x.s; syncInputs(); persist();
+  if ($("#libAutoScene").checked) suggestScene(true);
+  fontsReady().then(() => refresh(true)); checkDup();
+  const top = document.querySelector(".stage"); if (top && window.innerWidth < 960) top.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+  if (x.used) setStatus(`이 글은 ${fmtDate(x.used)}에 이미 영상으로 만들었어요. 다른 장면으로 새 버전을 만들 수는 있어요.`, "err");
+  else setStatus("글을 넣었어요. 미리보기로 확인해 보세요.", "ok");
+}
+function checkDup(){ const it = findItem(S.text); const n = $("#dupNote");
+  if (it && it.used){ n.textContent = `⚠ 이미 ${fmtDate(it.used)}에 만든 글이에요 (${it.uses || 1}회).`; n.className = "status err"; }
+  else { n.textContent = ""; n.className = "status"; } }
+function markUsed(){ const r = addItem({t:S.text, a:S.author, s:S.source, c:"좋은글"}); const it = r.item; if (!it) return;
+  it.used = Date.now(); it.uses = (it.uses || 0) + 1; if (!it.a && S.author) it.a = S.author; if (!it.s && S.source) it.s = S.source; saveLib(); renderLib(); checkDup(); }
+
+segment($("#libCatSeg"), LIB_CATS, "libCat", renderLib);
+segment($("#libFeelSeg"), F_FEEL, "libFeel", renderLib);
+$("#libStatus").onchange = renderLib; $("#libSearch").oninput = renderLib;
+$("#libPick").onclick = () => { const list = libFiltered().filter(x => !x.used); if (!list.length){ setStatus("조건에 맞는 '아직 안 만든 글'이 없어요. 필터를 바꾸거나 글을 추가해 주세요.", "err"); return; } loadItem(list[Math.floor(Math.random() * list.length)]); };
+$("#text").addEventListener("input", checkDup);
+
+$("#addBtn").onclick = () => { const m = $("#addMsg"); const r = addItem({t:$("#addText").value, a:$("#addAuthor").value, s:$("#addSource").value, c:$("#addCat").value, f:$("#addFeel").value});
+  if (r.added){ saveLib(); renderLib(); ["#addText","#addAuthor","#addSource"].forEach(id => $(id).value = ""); m.textContent = "창고에 추가했어요."; m.className = "status ok"; }
+  else if (r.dup){ m.textContent = "이미 창고에 있는 글이에요."; m.className = "status err"; }
+  else { m.textContent = "본문을 입력해 주세요."; m.className = "status err"; } };
+
+// 구글 시트(탭 구분) · CSV 가져오기
+function parseDelimited(text){
+  const delim = text.includes("\t") ? "\t" : ","; const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++){ const ch = text[i];
+    if (q){ if (ch === '"'){ if (text[i+1] === '"'){ cell += '"'; i++; } else q = false; } else cell += ch; }
+    else if (ch === '"' && cell === "") q = true;
+    else if (ch === delim){ row.push(cell); cell = ""; }
+    else if (ch === "\n" || ch === "\r"){ if (ch === "\r" && text[i+1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+    else cell += ch; }
+  if (cell || row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim()));
+}
+function importRows(rows){
+  if (!rows.length) return {added:0, dup:0};
+  let idx = {t:0, a:1, s:2, c:3, f:4}; const h = rows[0].map(c => c.trim().toLowerCase());
+  const find = names => h.findIndex(c => names.some(n => c.includes(n)));
+  if (find(["본문","글귀","text","문장"]) >= 0){ idx = {t:find(["본문","글귀","text","문장"]), a:find(["저자","author","인물"]), s:find(["출처","source","작품"]), c:find(["분류","category"]), f:find(["느낌","feel","감정"])}; rows = rows.slice(1); }
+  const catMap = v => { v = (v || "").trim(); if (/책|도서|book/i.test(v)) return "책"; if (/드라마|영화|대사|drama|movie/i.test(v)) return "드라마"; if (/동기|유명|motiv/i.test(v)) return "동기부여"; return "좋은글"; };
+  let added = 0, dup = 0;
+  rows.forEach(r => { const g = k => idx[k] >= 0 ? (r[idx[k]] || "").trim() : ""; const t = g("t").replace(/\s*\/\s*/g, "\n"); if (!t) return;
+    const res = addItem({t, a:g("a"), s:g("s"), c:catMap(g("c")), f:g("f")}); if (res.added) added++; else if (res.dup) dup++; });
+  saveLib(); renderLib(); return {added, dup};
+}
+function importMsg(r){ const m = $("#importMsg"); m.textContent = `${r.added}개 추가 · 중복 ${r.dup}개 건너뜀`; m.className = "status " + (r.added ? "ok" : "err"); }
+$("#importBtn").onclick = () => { importMsg(importRows(parseDelimited($("#importText").value))); $("#importText").value = ""; };
+$("#importFile").onchange = async e => { const f = e.target.files[0]; if (!f) return; try { importMsg(importRows(parseDelimited((await f.text()).replace(/^﻿/, "")))); } catch(err){ const m = $("#importMsg"); m.textContent = "파일을 읽지 못했어요."; m.className = "status err"; } e.target.value = ""; };
+$("#exportBtn").onclick = async () => { const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [["본문","저자","출처","분류","느낌","제작일","제작횟수"].join(",")].concat(LIB.map(x => [x.t, x.a, x.s, CAT_LABEL[x.c] || "좋은 글", x.f, x.used ? fmtDate(x.used) : "", x.uses || 0].map(esc).join(",")));
+  const d = new Date(); const name = `글감창고_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}.csv`;
+  const r = await offerFile(new Blob(["﻿" + lines.join("\r\n")], {type:"text/csv"}), name);
+  const m = $("#importMsg"); m.textContent = (r === "saved" || r === "link") ? `${name} 로 백업했어요.` : "백업 저장이 취소되었거나 막혔어요."; m.className = "status " + ((r === "saved" || r === "link") ? "ok" : "err"); };
+
+// AI 글감 추천 (Gemini 텍스트 모델)
+$("#aiSuggest").onclick = async () => {
+  const m = $("#libAiMsg"), b = $("#aiSuggest"); const key = $("#apiKey").value.trim();
+  if (!key){ m.textContent = "'3. 배경 사진·영상 → AI로 생성' 칸에 Gemini API 키를 먼저 넣어 주세요."; m.className = "status err"; return; }
+  const topic = $("#aiTopic").value.trim() || "삶을 돌아보게 하는 문장", cat = $("#aiCat").value;
+  const avoid = LIB.slice(0, 60).map(x => x.t.replace(/\n/g, " ").slice(0, 30)).join(" / ");
+  const prompt = `당신은 40~60대 한국인을 위한 감성 글귀 큐레이터입니다.
+주제: ${topic}
+분류: ${cat === "골고루" ? "책 속 문장, 드라마·영화 대사, 현대 유명인의 실제 발언, 출처가 분명한 좋은 글을 골고루" : cat}
+규칙:
+- 공자·노자·맹자·석가·소크라테스 등 고대 성현의 말, 사자성어, 속담 같은 고전 명언은 절대 넣지 마세요.
+- 실제로 존재하는 문장만. 지어낸 문장 금지. 저자·작품이 조금이라도 불확실하면 verified를 false로.
+- 2~5줄, 공백 포함 70자 이내, 영상 자막용으로 의미 단위 줄바꿈(\\n).
+- 대구나 반전이 있는 문장 우선. 현대 시는 전문 대신 핵심 2줄만.
+- 아래 이미 있는 글과 겹치지 않게: ${avoid}
+JSON 배열만 출력, 10개: [{"text":"...","author":"...","source":"<책 제목> 또는 드라마 〈제목〉 또는 직함","category":"책|드라마|동기부여|좋은글","feel":"평온|희망|위로|그리움|사랑|도전","verified":true}]`;
+  b.disabled = true; m.textContent = "AI가 글감을 고르는 중… (5~15초)"; m.className = "status";
+  try {
+    let j = null, last = null;
+    for (const model of TXT_MODELS){
+      const r = await fetch(`${API}/models/${model}:generateContent`, {method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key},
+        body: JSON.stringify({contents:[{role:"user", parts:[{text:prompt}]}], generationConfig:{responseMimeType:"application/json", temperature:0.9}})});
+      const jj = await r.json().catch(() => ({}));
+      if (r.ok){ j = jj; break; } last = new Error((jj.error && jj.error.message) || ("오류 " + r.status)); if (r.status !== 404) throw last;
+    }
+    if (!j) throw last || new Error("사용 가능한 글 모델을 찾지 못했어요.");
+    const txt = ((((j.candidates || [])[0] || {}).content || {}).parts || []).map(x => x.text || "").join("");
+    let arr = []; try { arr = JSON.parse(txt.replace(/^```json|```$/g, "").trim()); } catch(e){ throw new Error("AI 답변을 읽지 못했어요. 한 번 더 눌러 주세요."); }
+    let added = 0, dup = 0;
+    (Array.isArray(arr) ? arr : []).forEach(o => { const r = addItem({t:o.text, a:o.author, s:o.source, c:o.category, f:o.feel, ai:true, unverified: o.verified === false}); if (r.added) added++; else if (r.dup) dup++; });
+    saveLib(); $("#libStatus").value = "unused"; renderLib();
+    m.textContent = `${added}개를 창고에 넣었어요${dup ? ` (중복 ${dup}개 제외)` : ""}. '출처 확인 필요' 표시는 직접 확인 후 쓰세요.`; m.className = "status ok";
+  } catch(e){ m.textContent = netErr(e); m.className = "status err"; } finally { b.disabled = false; }
+};
+renderLib(); checkDup();
 
 // 시작
 syncInputs(); syncFonts(); syncScenes(); sel.value = S.music; scrub.max = S.dur; showBgTab(false);
