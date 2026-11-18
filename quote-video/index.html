@@ -1060,6 +1060,37 @@ async function omniVideoBlob(j, key){
   const fr = ((j.candidates || [])[0] || {}).finishReason; const txt = parts.map(x => x.text || "").join(" ").trim();
   throw new Error("영상이 만들어지지 않았어요" + (fr ? ` (${fr})` : "") + (txt ? `: ${txt.slice(0, 160)}` : ". 프롬프트를 조금 바꿔 다시 시도해 주세요."));
 }
+// Gemini Omni: Interactions API (POST /interactions → 상태 확인 → 영상 받기)
+function findVideo(o){
+  if (!o || typeof o !== "object") return null;
+  if (Array.isArray(o)){ for (const x of o){ const r = findVideo(x); if (r) return r; } return null; }
+  const mt = o.mime_type || o.mimeType || "";
+  if ((o.type === "video" || /^video\//.test(mt)) && (o.data || o.uri || o.url)) return o;
+  for (const k of Object.keys(o)){ if (k === "input") continue; const r = findVideo(o[k]); if (r) return r; }
+  return null;
+}
+async function omniInteraction(model, key, prompt){
+  const H = {"Content-Type":"application/json","x-goog-api-key":key};
+  const body = {model, input:[{type:"image", data: aiImage.b64, mime_type: aiImage.mime}, {type:"text", text: prompt}],
+    response_format:{type:"video", aspect_ratio: vidAspect(), delivery:"inline"}, background:true};
+  let r = await fetch(`${API}/interactions`, {method:"POST", headers:H, body: JSON.stringify(body)});
+  let j = await r.json().catch(() => ({}));
+  if (!r.ok && /background/i.test(JSON.stringify(j))){ delete body.background; r = await fetch(`${API}/interactions`, {method:"POST", headers:H, body: JSON.stringify(body)}); j = await r.json().catch(() => ({})); }
+  if (!r.ok){ const er = j.error || j; const e = new Error(er.message || ("오류 " + r.status)); e.status = r.status; throw e; }
+  const t0 = Date.now(); const id = j.id || (j.name || "").replace(/^interactions\//, "");
+  while (!findVideo(j.outputs || j) && !/^(completed|failed|cancelled|canceled)$/i.test(j.status || "") && id){
+    if (Date.now() - t0 > 8*60e3) throw new Error("8분이 지나도 완성되지 않았어요. 잠시 후 다시 시도해 주세요.");
+    await new Promise(res => setTimeout(res, 6000));
+    const pr = await fetch(`${API}/interactions/${encodeURIComponent(id)}`, {headers:{"x-goog-api-key":key}}); j = await pr.json().catch(() => ({}));
+    if (!pr.ok) throw new Error(((j.error || j).message) || ("상태 확인 실패 " + pr.status));
+  }
+  if (/^(failed|cancelled|canceled)$/i.test(j.status || "")) throw new Error("영상 생성 실패: " + (((j.error || {}).message) || j.status));
+  const v = findVideo(j.outputs || j);
+  if (!v) { const txt = JSON.stringify(j.outputs || j).slice(0, 200); throw new Error("영상이 만들어지지 않았어요 (안전 필터일 수 있어요). 응답: " + txt); }
+  if (v.data){ const bin = atob(v.data); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return new Blob([u8], {type: v.mime_type || v.mimeType || "video/mp4"}); }
+  const uri = v.uri || v.url; let vr; try { vr = await fetch(uri, {headers:{"x-goog-api-key":key}}); if (!vr.ok) throw 0; } catch(e){ vr = await fetch(uri + (uri.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(key)); }
+  if (!vr.ok) throw new Error("영상 내려받기 실패 (" + vr.status + ")"); return await vr.blob();
+}
 async function veoVideoBlob(model, key, prompt){
   const r = await fetch(`${API}/models/${encodeURIComponent(model)}:predictLongRunning`, {method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key},
     body: JSON.stringify({instances:[{prompt, image:{bytesBase64Encoded: aiImage.b64, mimeType: aiImage.mime}}], parameters:{aspectRatio: vidAspect(), negativePrompt: VEO_NEG}})});
@@ -1084,13 +1115,7 @@ async function genVideo(){
     for (const m of modelList("#vidModel", VID_MODELS[S.veo] || VID_MODELS.best)){
       try {
         if (m.startsWith("veo")) blob = await veoVideoBlob(m, key, prompt);
-        else {
-          const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 8*60e3);
-          const r = await fetch(`${API}/models/${encodeURIComponent(m)}:generateContent`, {method:"POST", signal: ctl.signal, headers:{"Content-Type":"application/json","x-goog-api-key":key},
-            body: JSON.stringify({contents:[{role:"user", parts:[{inlineData:{mimeType: aiImage.mime, data: aiImage.b64}}, {text: prompt}]}], generationConfig:{responseModalities:["VIDEO"], imageConfig:{aspectRatio: vidAspect()}}})}).finally(() => clearTimeout(to));
-          const j = await r.json().catch(() => ({})); if (!r.ok){ const e = new Error((j.error && j.error.message) || ("오류 " + r.status)); e.status = r.status; throw e; }
-          blob = await omniVideoBlob(j, key);
-        }
+        else blob = await omniInteraction(m, key, prompt);
         used = m; break;
       } catch(e){ last = e; if (e.name === "AbortError") throw new Error("8분이 지나도 응답이 없어요. 잠시 후 다시 시도해 주세요.");
         if (e.status === 404 || /not found|not supported|is not available/i.test(e.message || "")) continue; throw e; }
