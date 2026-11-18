@@ -1,7 +1,7 @@
 -- 회무노트 v2 추가 테이블 (그래프마스터 · AI 가공 결과 보관)
--- Supabase → SQL Editor → New query 에 전체를 붙여넣고 Run. 여러 번 실행해도 안전합니다.
+-- 순서: ① 테이블 → ② 권한(grant) → ③ RLS 켜기 → ④ 정책. 여러 번 실행해도 안전합니다.
 
--- ① 그래프마스터: 저장한 차트
+-- ① 테이블
 create table if not exists public.charts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -15,9 +15,9 @@ create table if not exists public.charts (
 );
 create index if not exists charts_user_updated on public.charts (user_id, updated_at desc);
 drop trigger if exists charts_touch on public.charts;
-create trigger charts_touch before update on public.charts for each row execute function public.touch_updated_at();
+create trigger charts_touch before update on public.charts
+  for each row execute function public.touch_updated_at();
 
--- ② AI 가공 결과(요약 카드·질의 포인트·비교표 등): 자료별·종류별 1건 보관 → 다시 볼 때 비용 0
 create table if not exists public.ai_outputs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -30,14 +30,18 @@ create table if not exists public.ai_outputs (
   unique (user_id, document_id, kind, ref)
 );
 
--- 본인 행만 접근
-do $$
-declare t text;
-begin
-  foreach t in array array['charts','ai_outputs'] loop
-    execute format('alter table public.%I enable row level security', t);
-    execute format('drop policy if exists own_rows on public.%I', t);
-    execute format('create policy own_rows on public.%I for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
-    execute format('grant select, insert, update, delete on public.%I to authenticated', t);
-  end loop;
-end $$;
+-- ② 권한: 로그인 사용자만(비로그인 anon 은 권한 없음)
+grant select, insert, update, delete on public.charts to authenticated;
+grant select, insert, update, delete on public.ai_outputs to authenticated;
+
+-- ③ RLS 켜기
+alter table public.charts enable row level security;
+alter table public.ai_outputs enable row level security;
+
+-- ④ 정책: 본인 행만
+drop policy if exists own_rows on public.charts;
+create policy own_rows on public.charts for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists own_rows on public.ai_outputs;
+create policy own_rows on public.ai_outputs for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
