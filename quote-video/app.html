@@ -23,12 +23,54 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 header h1{font-family:var(--display);font-weight:400;font-size:clamp(40px,6vw,58px);line-height:1;margin:0;letter-spacing:.5px}
 header h1 b{color:var(--accent);font-weight:400}
 header p{margin:0;color:var(--muted);max-width:46ch;font-size:14px}
-.grid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}
-@media(min-width:960px){.grid{grid-template-columns:minmax(0,1fr) minmax(0,440px)}.stage{position:sticky;top:max(16px,env(safe-area-inset-top,0px))}}
-.stage{display:flex;flex-direction:column;gap:12px;align-items:center;min-width:0}
+/* 폰(기본): 미리보기를 위에 고정하고 설정을 아래로 스크롤 · 태블릿: 2단 · PC: 3단 */
+.grid{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"stage" "a" "b";gap:16px;align-items:start}
+.stage{grid-area:stage;display:flex;flex-direction:column;gap:8px;align-items:center;min-width:0;
+  position:sticky;top:0;z-index:20;background:var(--bg);padding-top:max(8px,env(safe-area-inset-top,0px));padding-bottom:8px;margin-inline:-4px;border-bottom:1px solid var(--line)}
+.col-a{grid-area:a}.col-b{grid-area:b}
+.panel{scroll-margin-top:calc(var(--stick-h,45vh) + 8px)}
+@media(max-width:759px){html{scroll-padding-top:calc(var(--stick-h,45vh) + 8px);scroll-padding-bottom:84px}}
+.secnav{display:flex;gap:6px;overflow-x:auto;width:100%;padding:2px 0 0;scrollbar-width:none}
+.secnav::-webkit-scrollbar{display:none}
+.secnav a{flex:0 0 auto;text-decoration:none;color:var(--fg);border:1px solid var(--line);background:var(--panel2);border-radius:999px;padding:5px 12px;font-size:13px}
+.pv-opts{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:center}
+.pv-opts .check{font-size:12px;color:var(--muted)}
+.btn.icon{min-width:52px}
+:root{--pv-h:34vh}
+body.pv-big{--pv-h:58vh}
+#cv{max-height:var(--pv-h)!important}
+@media(max-width:759px){
+  :root{--pv-h:30vh} body.pv-big{--pv-h:52vh}
+  header{display:none}
+  body{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  .time{display:none}
+  .pv-opts{gap:2px 12px}
+  .pv-opts .check{font-size:11.5px}
+  .stage .cta{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--bg);border-top:1px solid var(--line);
+    padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));margin:0}
+  .stage .bar{height:3px}
+  .stage .cta{max-width:none}
+  .stage .btn.primary{min-height:40px;font-size:15px}
+  .stage .status{font-size:12px;margin:0;min-height:0}
+  .screen{padding:4px;border-radius:12px}
+  #result video{max-height:24vh}
+  input[type=text],input[type=password],textarea,select{font-size:16px}
+}
+@media(min-width:760px){
+  :root{--pv-h:72vh} body.pv-big{--pv-h:84vh}
+  .grid{grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);grid-template-areas:"stage a" "stage b"}
+  .stage{top:max(12px,env(safe-area-inset-top,0px));align-self:start;border-bottom:0;padding:0;margin:0;max-height:calc(100vh - 24px);overflow:auto}
+  .secnav{display:none}
+  .panel{scroll-margin-top:16px}
+}
+@media(min-width:1200px){
+  :root{--pv-h:76vh}
+  .wrap{max-width:1560px}
+  .grid{grid-template-columns:minmax(0,1fr) minmax(380px,500px) minmax(0,1fr);grid-template-areas:"a stage b"}
+}
 .screen{background:#000;border:1px solid var(--line);border-radius:18px;padding:10px;display:flex;justify-content:center;max-width:100%}
 #cv{display:block;max-width:100%;max-height:68vh;width:auto;height:auto;border-radius:10px;background:#222}
-.transport{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;width:100%;max-width:560px}
+.transport{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;justify-content:center;width:100%;max-width:560px}
 .transport input[type=range]{flex:1 1 160px;min-width:0}
 .time{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;min-width:74px;text-align:right}
 .cta{display:flex;flex-wrap:wrap;gap:10px;width:100%;max-width:560px}
@@ -108,9 +150,14 @@ footer{color:var(--muted);font-size:12px;text-align:center}
     <section class="stage" aria-label="미리보기">
       <div class="screen"><canvas id="cv" width="540" height="960" aria-label="영상 미리보기"></canvas></div>
       <div class="transport">
-        <button class="btn small" id="playBtn" type="button">▶ 미리보기 재생</button>
+        <button class="btn small" id="playBtn" type="button">▶ 재생</button>
         <input type="range" id="scrub" min="0" max="10" step="0.01" value="7.5" aria-label="재생 위치">
         <span class="time" id="timeLbl">7.5 / 10초</span>
+        <button class="btn small icon" id="sizeBtn" type="button" aria-label="미리보기 크게 보기">크게</button>
+      </div>
+      <div class="pv-opts">
+        <label class="check"><input type="checkbox" id="loopPv"> 설정 바꾸는 동안 계속 재생</label>
+        <label class="check"><input type="checkbox" id="soundPv" checked> 미리보기 소리</label>
       </div>
       <div class="cta">
         <button class="btn primary" id="makeBtn" type="button">영상 만들기 (MP4 저장)</button>
@@ -118,9 +165,12 @@ footer{color:var(--muted);font-size:12px;text-align:center}
       <div class="bar" aria-hidden="true"><i id="barFill"></i></div>
       <p class="status" id="status">미리보기 재생을 누르면 음악과 함께 움직임을 확인할 수 있어요.</p>
       <div id="result" hidden></div>
+      <nav class="secnav" aria-label="설정 바로가기">
+        <a href="#libPanel">글감</a><a href="#p-text">글</a><a href="#p-scene">장면</a><a href="#p-bg">배경</a><a href="#p-font">글씨</a><a href="#p-fx">효과</a><a href="#p-music">음악</a><a href="#p-screen">화면</a>
+      </nav>
     </section>
 
-    <section class="controls" aria-label="설정">
+    <section class="controls col-a" aria-label="글 설정">
       <div class="panel" id="libPanel">
         <h2><span>글감 창고</span><small id="libCount"></small></h2>
         <div class="seg" id="libCatSeg" role="group" aria-label="글 분류"></div>
@@ -185,7 +235,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
         </details>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="p-text">
         <h2><span><span class="step">1</span>글 넣기</span><small>Enter로 줄을 나누면 그 줄 단위로 나타나요</small></h2>
         <p class="status" id="dupNote" style="text-align:left;min-height:0"></p>
         <label class="f">본문
@@ -202,7 +252,10 @@ footer{color:var(--muted);font-size:12px;text-align:center}
         </div>
       </div>
 
-      <div class="panel">
+    </section>
+
+    <section class="controls col-b" aria-label="장면·효과 설정">
+      <div class="panel" id="p-scene">
         <h2><span><span class="step">2</span>장면 스타일</span><small id="sceneCount">30가지 · 인물은 모두 한국인으로 생성</small></h2>
         <div class="seg" id="seasonSeg" role="group" aria-label="계절"></div>
         <div class="seg" id="feelSeg" role="group" aria-label="느낌"></div>
@@ -210,7 +263,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
         <p class="hint" id="sceneDesc"></p>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="p-bg">
         <h2><span><span class="step">3</span>배경 사진·영상</span><small>사진 퀄리티를 결정하는 단계</small></h2>
         <div class="seg" id="bgTabs" role="group" aria-label="배경 방식">
           <button type="button" data-v="ai" aria-pressed="true">AI로 생성</button>
@@ -225,6 +278,10 @@ footer{color:var(--muted);font-size:12px;text-align:center}
           <label class="check"><input type="checkbox" id="rememberKey"> 이 기기에 키 기억하기</label>
           <p class="hint"><b>순서:</b> ① 후보 사진 4장을 받아 레퍼런스와 가장 닮은 1장을 고르고 → ② 그 사진 그대로 Veo가 움직이게 합니다. 사진을 먼저 고르기 때문에 엉뚱한 영상이 나오지 않아요.</p>
           <div class="tabs">
+            <div class="seg" id="imgQSeg" role="group" aria-label="사진 품질" style="width:100%">
+              <button type="button" data-v="best" aria-pressed="true">최고 화질 (Pro · 2K)</button>
+              <button type="button" data-v="fast" aria-pressed="false">빠르게 (Flash)</button>
+            </div>
             <button class="btn small" id="genImg" type="button">① 후보 사진 4장 만들기 (약 15초)</button>
           </div>
           <div class="cands" id="cands" hidden></div>
@@ -275,7 +332,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
         <div class="slider"><span>사진 위치(상하)</span><input type="range" id="focusY" min="0" max="1" step="0.01" value="0.6"><output id="focusYo">60%</output></div>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="p-font">
         <h2><span><span class="step">4</span>글씨체</span><small>10가지 손글씨·붓글씨</small></h2>
         <div class="fonts" id="fonts"></div>
         <div class="slider"><span>글씨 크기</span><input type="range" id="size" min="0.6" max="1.5" step="0.01" value="1"><output id="sizeo">100%</output></div>
@@ -296,7 +353,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
         </label>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="p-fx">
         <h2><span><span class="step">5</span>움직임과 색감</span></h2>
         <label class="f">글이 나타나는 방식
           <div class="seg" id="animSeg" role="group" aria-label="글 등장 방식"></div>
@@ -308,11 +365,12 @@ footer{color:var(--muted);font-size:12px;text-align:center}
           <div class="seg" id="gradeSeg" role="group" aria-label="색감"></div>
         </label>
         <div class="slider"><span>상단 밝게</span><input type="range" id="haze" min="0" max="0.8" step="0.01" value="0.32"><output id="hazeo">32%</output></div>
+        <div class="slider"><span>빛 번짐</span><input type="range" id="bloom" min="0" max="0.6" step="0.01" value="0.18"><output id="bloomo">18%</output></div>
         <div class="slider"><span>필름 입자</span><input type="range" id="grain" min="0" max="0.25" step="0.01" value="0.07"><output id="graino">7%</output></div>
         <label class="check"><input type="checkbox" id="fadeOut"> 끝에서 글이 서서히 사라지기</label>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="p-music">
         <h2><span><span class="step">6</span>배경 음악</span><small>저작권 걱정 없는 자체 생성 음악</small></h2>
         <label class="f">분위기
           <select id="music"></select>
@@ -323,7 +381,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
         <div class="slider"><span>음량</span><input type="range" id="vol" min="0" max="1" step="0.01" value="0.7"><output id="volo">70%</output></div>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="p-screen">
         <h2><span><span class="step">7</span>화면과 길이</span></h2>
         <label class="f">화면 비율
           <div class="seg" id="ratioSeg" role="group" aria-label="화면 비율"></div>
@@ -370,11 +428,12 @@ const AUTHOR_FONT = "Gowun Batang";
 
 const KOREAN = "All people in the scene are Korean (ethnically Korean adults with natural Korean appearance, hairstyles and everyday Korean clothing).";
 // 레퍼런스(감성 글귀 릴스) 화면을 분석해 고정한 스타일 규칙
-const COMMON = "STYLE LOCK, match this exact look: a quiet Korean 'good words' quote reel background photo. Bright, airy, softly overexposed photograph with low contrast and gently desaturated pastel colors (muted peach, dusty blue, fog gray, pale cream). The entire upper half of the frame is plain, smooth sky, mist or softly blurred background with no objects, no birds, no visible sun disk and no busy detail, so handwritten text can sit on it. The subject is small, in the lower 35% of the frame, seen from behind or in silhouette with faces not visible, standing still or walking slowly. Real-world location, eye-level wide shot, 35mm lens, soft diffused natural light, faint film grain, like a calm editorial lifestyle photo. Photorealistic. Absolutely no text, letters, captions, logos, watermarks, borders or frames.";
+const COMMON = "STYLE LOCK, match this exact look: a quiet Korean 'good words' quote reel background photo. Bright, airy, softly overexposed photograph with low contrast and gently desaturated pastel colors (muted peach, dusty blue, fog gray, pale cream). The entire upper half of the frame is plain, smooth sky, mist or softly blurred background with no objects, no birds, no visible sun disk and no busy detail, so handwritten text can sit on it. The subject is small, in the lower 35% of the frame, seen from behind or in silhouette with faces not visible, standing still or walking slowly. Real-world location, eye-level wide shot, 35mm lens, soft diffused natural light, faint film grain, like a calm editorial lifestyle photo by a professional photographer. Photorealistic, ultra-detailed and crisp, natural human proportions and posture, clean gradients in the sky without banding, professional color science, high dynamic range. Absolutely no text, letters, captions, logos, watermarks, borders or frames.";
 const MOTION_SUFFIX = "Locked-off tripod camera: no pan, no zoom, no cuts. Calm, slow, realistic motion only.";
 const VEO_LOCK = "Animate this exact photograph as one continuous 8-second shot. Keep the composition, framing, colors, lighting, location and every person exactly as in the image; nobody turns toward the camera and faces stay hidden; no new people or objects appear. Only subtle natural motion: ";
 const VEO_NEG = "text, letters, subtitles, captions, watermark, logo, camera pan, zoom, camera shake, cuts, scene change, new people appearing, people turning to the camera, close-up faces, saturated colors, cartoon, CGI look, distorted bodies, fast motion";
 const IMG_MODELS = ["gemini-3.1-flash-image","gemini-3-pro-image","gemini-2.5-flash-image","imagen-4.0-generate-001"];
+const IMG_MODELS_BEST = ["gemini-3-pro-image","nano-banana-pro-preview","gemini-3.1-flash-image","gemini-2.5-flash-image"];
 const VID_MODELS = {fast:["veo-3.1-fast-generate-preview","veo-3.1-fast-generate-001","veo-3.0-fast-generate-001"], best:["veo-3.1-generate-preview","veo-3.1-generate-001","veo-3.0-generate-001"]};
 
 const SCENES = [
@@ -531,9 +590,9 @@ const MUSIC = {
 
 /* ---------------- 상태 ---------------- */
 const S = {text:SAMPLES[0].t, author:SAMPLES[0].a, source:SAMPLES[0].s, brand:"강산부동산", libCat:"all", libFeel:"all",
-  scene:"beach", font:FONTS[0].f, anim:"write", motion:"in", grade:"scene", haze:.32, grain:.07, ink:"auto",
+  scene:"beach", bloom:.18, imgQ:"best", font:FONTS[0].f, anim:"write", motion:"in", grade:"scene", haze:.32, grain:.07, ink:"auto",
   size:1, asize:1, lh:1, pos:"top", focusY:.6, ratio:"9:16", dur:10, music:"auto", vol:.7, fadeOut:false, q:1, bg:"ai"};
-const SAVE_KEYS = ["fSeason","fFeel","veo","text","author","source","brand","scene","font","anim","motion","grade","haze","grain","ink","size","asize","lh","pos","ratio","dur","music","vol","fadeOut","q"];
+const SAVE_KEYS = ["fSeason","fFeel","veo","bloom","imgQ","text","author","source","brand","scene","font","anim","motion","grade","haze","grain","ink","size","asize","lh","pos","ratio","dur","music","vol","fadeOut","q"];
 try { const saved = JSON.parse(localStorage.getItem("gyv-state") || "null"); if (saved) for (const k of SAVE_KEYS) if (k in saved) S[k] = saved[k]; } catch(e) {}
 let saveT = 0;
 function persist(){ clearTimeout(saveT); saveT = setTimeout(() => { try { const o = {}; SAVE_KEYS.forEach(k => o[k] = S[k]); localStorage.setItem("gyv-state", JSON.stringify(o)); } catch(e) {} }, 400); }
@@ -654,8 +713,11 @@ function buildBase(){
   const cover = Math.max(FW/sw, FH/sh) * ZMAX;
   const c = document.createElement("canvas"); c.width = Math.ceil(sw*cover); c.height = Math.ceil(sh*cover);
   const g = c.getContext("2d"); if (FILTER_OK) g.filter = GRADE_FILTER[gradeKey()] || "none"; g.drawImage(s, 0, 0, c.width, c.height);
-  base = c; sampleInk();
+  base = c; buildBloom(c); sampleInk();
 }
+let bloomC = null; const vBloom = document.createElement("canvas"); const vBloomG = vBloom.getContext("2d");
+function buildBloom(c){ const w = Math.max(32, Math.round(c.width/4)), h = Math.max(32, Math.round(c.height/4)); const b = document.createElement("canvas"); b.width = w; b.height = h; const g = b.getContext("2d");
+  if (FILTER_OK) g.filter = `blur(${Math.round(w/60)}px) brightness(1.08) saturate(1.1)`; g.drawImage(c, 0, 0, w, h); bloomC = b; }
 function sampleInk(){
   const t = document.createElement("canvas"); t.width = 36; t.height = 64; const g = t.getContext("2d");
   try {
@@ -727,11 +789,16 @@ function drawBg(t){
   if (src.type === "video" && src.el.readyState >= 2){
     const v = src.el, vw = v.videoWidth, vh = v.videoHeight; const cover = Math.max(FW/vw, FH/vh) * (1 + (z-1)*.6);
     const dw = vw*cover, dh = vh*cover; if (FILTER_OK) ctx.filter = GRADE_FILTER[gradeKey()] || "none";
-    ctx.drawImage(v, (FW-dw)*fx, (FH-dh)*S.focusY, dw, dh); if (FILTER_OK) ctx.filter = "none"; return;
+    ctx.drawImage(v, (FW-dw)*fx, (FH-dh)*S.focusY, dw, dh); if (FILTER_OK) ctx.filter = "none";
+    if (S.bloom > 0){ const w = 180, h = Math.round(180*FH/FW); if (vBloom.width !== w || vBloom.height !== h){ vBloom.width = w; vBloom.height = h; }
+      if (FILTER_OK) vBloomG.filter = "blur(3px) brightness(1.08)"; vBloomG.drawImage(cv, 0, 0, w, h); if (FILTER_OK) vBloomG.filter = "none";
+      ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = S.bloom; ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(vBloom, 0, 0, cv.width, cv.height); ctx.restore(); }
+    return;
   }
   if (!base) { ctx.fillStyle = "#222"; ctx.fillRect(0,0,FW,FH); return; }
   const dw = base.width * z / ZMAX, dh = base.height * z / ZMAX;
   ctx.drawImage(base, (FW-dw)*fx, (FH-dh)*S.focusY, dw, dh);
+  if (bloomC && S.bloom > 0){ ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = S.bloom; ctx.drawImage(bloomC, (FW-dw)*fx, (FH-dh)*S.focusY, dw, dh); ctx.restore(); }
 }
 function drawHaze(L){
   if (S.haze <= 0) return; const dark = inkDark(); const col = dark ? "255,255,255" : "0,0,0"; const h = S.haze * (dark ? 1 : .8);
@@ -800,6 +867,7 @@ function drawText(t, L){
   }
 }
 function frame(t){
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
   ctx.setTransform(K,0,0,K,0,0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
   const L = layout(); drawBg(t); drawHaze(L); drawFx(); drawText(t, L);
 }
@@ -858,14 +926,14 @@ function drawStill(t = +scrub.value){ if (src.type === "video" && !playing && !r
 function setScale(k){ K = k; cv.width = Math.round(FW*K); cv.height = Math.round(FH*K); }
 function loopPreview(){
   if (!playing) return; const t = (performance.now() - playStart) / 1000;
-  if (t >= S.dur){ playStart = performance.now(); if (src.type === "video") { src.el.currentTime = 0; } stopMusic(musicRun); musicRun = startMusic([ac().destination], S.dur); }
+  if (t >= S.dur){ playStart = performance.now(); if (src.type === "video") { src.el.currentTime = 0; } stopMusic(musicRun); musicRun = $("#soundPv").checked ? startMusic([ac().destination], S.dur) : null; }
   const tt = Math.min(t, S.dur); frame(tt); showTime(tt); raf = requestAnimationFrame(loopPreview);
 }
 async function play(){
   if (recording) return; if (playing) return stop();
   await fontsReady(); playing = true; $("#playBtn").textContent = "■ 정지";
   try { await ac().resume(); } catch(e){}
-  musicRun = startMusic([ac().destination], S.dur);
+  musicRun = $("#soundPv").checked ? startMusic([ac().destination], S.dur) : null;
   if (src.type === "video"){ src.el.currentTime = 0; src.el.play().catch(()=>{}); }
   playStart = performance.now(); loopPreview();
 }
@@ -893,7 +961,7 @@ async function makeVideo(){
   const run = startMusic([dest, a.destination], S.dur);
   if (run) dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
   const mime = pickMime(); let rec;
-  try { rec = new MediaRecorder(stream, mime ? {mimeType: mime, videoBitsPerSecond: q >= 1 ? 12e6 : 6e6, audioBitsPerSecond: 192000} : undefined); }
+  try { rec = new MediaRecorder(stream, mime ? {mimeType: mime, videoBitsPerSecond: q >= 1 ? 16e6 : 8e6, audioBitsPerSecond: 192000} : undefined); }
   catch(e){ recording = false; btn.disabled = false; setScale(.5); setStatus("녹화를 시작하지 못했어요: " + e.message, "err"); return; }
   const chunks = []; rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
   const done = new Promise(r => rec.onstop = r);
@@ -950,9 +1018,13 @@ async function imageOnce(model, key, prompt){
     const j = await r.json().catch(() => ({})); if (!r.ok) { const e = new Error((j.error && j.error.message) || ("오류 " + r.status)); e.status = r.status; throw e; }
     const p = (j.predictions || [])[0]; if (!p || !p.bytesBase64Encoded) throw new Error("사진이 만들어지지 않았어요."); return {b64: p.bytesBase64Encoded, mime: p.mimeType || "image/png"};
   }
-  const r = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key},
-    body: JSON.stringify({contents:[{role:"user", parts:[{text: prompt}]}], generationConfig:{responseModalities:["IMAGE"], imageConfig:{aspectRatio: imgAspect()}}})});
-  const j = await r.json().catch(() => ({})); if (!r.ok) { const e = new Error((j.error && j.error.message) || ("오류 " + r.status)); e.status = r.status; throw e; }
+  const call = imageConfig => fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key},
+    body: JSON.stringify({contents:[{role:"user", parts:[{text: prompt}]}], generationConfig:{responseModalities:["IMAGE"], imageConfig}})});
+  // 최고 화질: 2K 해상도 요청, 모델이 지원하지 않으면 기본 해상도로 다시 요청
+  let r = await call(S.imgQ === "best" ? {aspectRatio: imgAspect(), imageSize:"2K"} : {aspectRatio: imgAspect()});
+  let j = await r.json().catch(() => ({}));
+  if (!r.ok && r.status === 400 && S.imgQ === "best"){ r = await call({aspectRatio: imgAspect()}); j = await r.json().catch(() => ({})); }
+  if (!r.ok) { const e = new Error((j.error && j.error.message) || ("오류 " + r.status)); e.status = r.status; throw e; }
   const parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
   const im = parts.find(x => x.inlineData || x.inline_data); const d = im && (im.inlineData || im.inline_data);
   if (!d) throw new Error("사진이 만들어지지 않았어요. (안전 필터일 수 있어요) 프롬프트를 조금 바꿔 다시 시도해 주세요.");
@@ -962,7 +1034,7 @@ async function genImage(){
   const key = apiKey(); if (!key) return; const b = $("#genImg"); b.disabled = true; aiMsg("AI가 후보 사진 4장을 그리는 중… (20~40초)");
   try {
     const prompt = $("#imgPrompt").value; let list = [], used = "", last = null;
-    for (const m of modelList("#imgModel", IMG_MODELS)){
+    for (const m of modelList("#imgModel", S.imgQ === "fast" ? IMG_MODELS : IMG_MODELS_BEST)){
       try { const first = await imageOnce(m, key, prompt); used = m;
         const rest = await Promise.allSettled([1,2,3].map(() => imageOnce(m, key, prompt)));
         list = [first, ...rest.filter(x => x.status === "fulfilled").map(x => x.value)]; break;
@@ -1056,6 +1128,7 @@ bindSeg($("#inkSeg"), "ink", () => { lineCache.clear(); refresh(); });
 bindSeg($("#posSeg"), "pos", () => { sampleInk(); refresh(); });
 bindSeg($("#qSeg"), "q");
 bindSeg($("#veoSeg"), "veo");
+bindSeg($("#imgQSeg"), "imgQ");
 bindSeg($("#bgTabs"), "bg", () => showBgTab(true));
 function showBgTab(user){ ["ai","upload","scene"].forEach(k => $("#tab-" + k).hidden = S.bg !== k); if (user && S.bg === "scene"){ stop(); src = {type:"scene"}; buildBase(); refresh(); } }
 
@@ -1067,7 +1140,7 @@ function syncInputs(){ $("#text").value = S.text; $("#author").value = S.author;
 $("#autoBreak").onclick = () => { S.text = autoBreak(S.text); syncInputs(); refresh(true); persist(); };
 $("#suggest").onclick = () => suggestScene(false);
 
-const sliders = [["size",v=>Math.round(v*100)+"%"],["asize",v=>Math.round(v*100)+"%"],["lh",v=>Math.round(v*100)+"%"],["haze",v=>Math.round(v*100)+"%"],["grain",v=>Math.round(v*100)+"%"],["vol",v=>Math.round(v*100)+"%"],["focusY",v=>Math.round(v*100)+"%"]];
+const sliders = [["bloom",v=>Math.round(v*100)+"%"],["size",v=>Math.round(v*100)+"%"],["asize",v=>Math.round(v*100)+"%"],["lh",v=>Math.round(v*100)+"%"],["haze",v=>Math.round(v*100)+"%"],["grain",v=>Math.round(v*100)+"%"],["vol",v=>Math.round(v*100)+"%"],["focusY",v=>Math.round(v*100)+"%"]];
 sliders.forEach(([k, fmt]) => { const el = $("#" + k), out = $("#" + k + "o"); el.value = S[k]; out.textContent = fmt(S[k]);
   el.oninput = () => { S[k] = +el.value; out.textContent = fmt(S[k]); if (k === "size" || k === "asize" || k === "lh") lineCache.clear(); if (k !== "vol") refresh(); persist(); }; });
 $("#fadeOut").checked = S.fadeOut; $("#fadeOut").onchange = e => { S.fadeOut = e.target.checked; refresh(); persist(); };
@@ -1246,6 +1319,19 @@ JSON 배열만 출력, 10개: [{"text":"...","author":"...","source":"<책 제�
   } catch(e){ m.textContent = netErr(e); m.className = "status err"; } finally { b.disabled = false; }
 };
 renderLib(); checkDup();
+
+/* ---------------- 화면 크기별 미리보기 ---------------- */
+// 폰: 상단 고정 미리보기의 실제 높이만큼 스크롤 여백을 맞춰 설정 항목이 가려지지 않게 함
+const stageEl = document.querySelector(".stage");
+const syncStick = () => document.documentElement.style.setProperty("--stick-h", (innerWidth < 760 ? stageEl.offsetHeight : 0) + "px");
+if (window.ResizeObserver) new ResizeObserver(syncStick).observe(stageEl); addEventListener("resize", syncStick); syncStick();
+$("#sizeBtn").onclick = () => { const big = document.body.classList.toggle("pv-big"); $("#sizeBtn").textContent = big ? "작게" : "크게"; $("#sizeBtn").setAttribute("aria-label", big ? "미리보기 작게 보기" : "미리보기 크게 보기"); };
+$("#loopPv").onchange = e => { if (e.target.checked && !playing) play(); if (!e.target.checked && playing) stop(); };
+$("#soundPv").onchange = e => { if (!playing) return; if (!e.target.checked){ stopMusic(musicRun); musicRun = null; } else { stop(); play(); } };
+document.querySelectorAll(".secnav a").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); const t = document.querySelector(a.getAttribute("href")); if (t) t.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block:"start"}); }));
+// 계속 재생 모드: 재생이 멈춘 상태에서 설정을 바꾸면 자동으로 다시 재생
+document.querySelector(".grid").addEventListener("change", e => { if ($("#loopPv").checked && !playing && !recording && !e.target.closest(".stage")) play(); });
+document.querySelector(".grid").addEventListener("click", e => { if ($("#loopPv").checked && !recording && e.target.closest(".controls button, .controls .scene, .controls .chip")) setTimeout(() => { if (!playing && $("#loopPv").checked) play(); }, 60); });
 
 // 시작
 syncInputs(); syncFonts(); syncScenes(); sel.value = S.music; scrub.max = S.dur; showBgTab(false);
