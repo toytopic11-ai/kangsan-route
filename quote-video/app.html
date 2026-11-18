@@ -276,7 +276,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
             <input type="password" id="apiKey" autocomplete="off" placeholder="AIza...">
           </label>
           <label class="check"><input type="checkbox" id="rememberKey"> 이 기기에 키 기억하기</label>
-          <p class="hint"><b>순서:</b> ① 후보 사진 4장을 받아 레퍼런스와 가장 닮은 1장을 고르고 → ② 그 사진 그대로 Veo가 움직이게 합니다. 사진을 먼저 고르기 때문에 엉뚱한 영상이 나오지 않아요.</p>
+          <p class="hint"><b>순서:</b> ① 후보 사진 4장을 받아 레퍼런스와 가장 닮은 1장을 고르고 → ② 그 사진 그대로 AI(Gemini Omni)가 움직이게 합니다. 사진을 먼저 고르기 때문에 엉뚱한 영상이 나오지 않아요.</p>
           <div class="tabs">
             <div class="seg" id="imgQSeg" role="group" aria-label="사진 품질" style="width:100%">
               <button type="button" data-v="best" aria-pressed="true">최고 화질 (Pro · 2K)</button>
@@ -287,19 +287,19 @@ footer{color:var(--muted);font-size:12px;text-align:center}
           <div class="cands" id="cands" hidden></div>
           <label class="f">영상 품질
             <div class="seg" id="veoSeg" role="group" aria-label="영상 품질">
-              <button type="button" data-v="fast" aria-pressed="true">Fast · 1편 약 1,300원</button>
-              <button type="button" data-v="best" aria-pressed="false">최고화질 · 약 4,500원</button>
+              <button type="button" data-v="best" aria-pressed="true">Omni 1.2 (최신)</button>
+              <button type="button" data-v="fast" aria-pressed="false">Omni 미리보기판</button>
             </div>
           </label>
           <div class="tabs">
-            <button class="btn small" id="genVid" type="button">② 고른 사진을 움직이는 영상으로 (Veo, 1~3분)</button>
+            <button class="btn small" id="genVid" type="button">② 고른 사진을 움직이는 영상으로 (Omni, 1~3분)</button>
           </div>
           <p class="status" id="aiStatus" style="text-align:left"></p>
           <details>
             <summary>고급: 모델 이름 직접 지정</summary>
             <div class="row" style="margin-top:8px">
               <label class="f">사진 모델 <input type="text" id="imgModel" placeholder="비우면 자동 (gemini-3.1-flash-image…)"></label>
-              <label class="f">영상 모델 <input type="text" id="vidModel" placeholder="비우면 자동 (veo-3.1…)"></label>
+              <label class="f">영상 모델 <input type="text" id="vidModel" placeholder="비우면 자동 (gemini-omni…)"></label>
             </div>
             <p class="hint" style="margin-top:6px">비워 두면 최신 모델부터 차례로 시도합니다. 키 발급: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a></p>
           </details>
@@ -311,7 +311,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
             <input type="file" id="bgFile" accept="image/*,video/*">
           </label>
           <p class="hint">AI 앱에서 만든 사진·영상, 직접 찍은 포항 풍경 모두 좋아요. 영상이 10초보다 짧으면 자동으로 느리게 재생해 길이를 맞춥니다.</p>
-          <button class="btn small" id="genVid2" type="button">올린 사진을 Veo로 움직이기</button>
+          <button class="btn small" id="genVid2" type="button">올린 사진을 AI로 움직이기</button>
           <p class="hint">마음에 드는 레퍼런스 분위기의 사진을 올리고 이 버튼을 누르면, 그 사진의 구도·색감을 그대로 유지한 채 구름·파도만 움직입니다. (API 키는 'AI로 생성' 탭에 입력)</p>
         </div>
 
@@ -434,7 +434,8 @@ const VEO_LOCK = "Animate this exact photograph as one continuous 8-second shot.
 const VEO_NEG = "text, letters, subtitles, captions, watermark, logo, camera pan, zoom, camera shake, cuts, scene change, new people appearing, people turning to the camera, close-up faces, saturated colors, cartoon, CGI look, distorted bodies, fast motion";
 const IMG_MODELS = ["gemini-3.1-flash-image","gemini-3-pro-image","gemini-2.5-flash-image","imagen-4.0-generate-001"];
 const IMG_MODELS_BEST = ["gemini-3-pro-image","nano-banana-pro-preview","gemini-3.1-flash-image","gemini-2.5-flash-image"];
-const VID_MODELS = {fast:["veo-3.1-fast-generate-preview","veo-3.1-fast-generate-001","veo-3.0-fast-generate-001"], best:["veo-3.1-generate-preview","veo-3.1-generate-001","veo-3.0-generate-001"]};
+// 영상: Gemini Omni Flash 우선 (Gemini API의 Veo는 종료), Veo는 혹시 열려 있을 때만 마지막 후보로 시도
+const VID_MODELS = {best:["gemini-omni-1.2-flash","gemini-omni-flash-preview","gemini-omni-1.1-flash","veo-3.1-generate-preview"], fast:["gemini-omni-flash-preview","gemini-omni-1.2-flash","gemini-omni-1.1-flash","veo-3.1-fast-generate-preview"]};
 
 const SCENES = [
   // ── 바다 · 물가 ──
@@ -1047,31 +1048,58 @@ async function genImage(){
     aiMsg(`후보 ${list.length}장 완성 (${used}). 레퍼런스와 가장 닮은 사진을 눌러 고른 뒤 ②를 누르세요.`, "ok");
   } catch(e){ aiMsg(netErr(e), "err"); } finally { b.disabled = false; }
 }
+// Omni 응답에서 영상 꺼내기: 바로 담긴 데이터(inlineData) 또는 파일 주소(fileData)
+async function omniVideoBlob(j, key){
+  const parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
+  for (const pt of parts){ const d = pt.inlineData || pt.inline_data;
+    if (d && /^video\//.test(d.mimeType || d.mime_type || "")){ const bin = atob(d.data); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return new Blob([u8], {type: d.mimeType || d.mime_type}); } }
+  for (const pt of parts){ const f = pt.fileData || pt.file_data; const uri = f && (f.fileUri || f.file_uri);
+    if (uri){ let r; try { r = await fetch(uri, {headers:{"x-goog-api-key":key}}); if (!r.ok) throw 0; } catch(e){ r = await fetch(uri + (uri.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(key)); }
+      if (!r.ok) throw new Error("영상 내려받기 실패 (" + r.status + ")"); return await r.blob(); } }
+  const fr = ((j.candidates || [])[0] || {}).finishReason; const txt = parts.map(x => x.text || "").join(" ").trim();
+  throw new Error("영상이 만들어지지 않았어요" + (fr ? ` (${fr})` : "") + (txt ? `: ${txt.slice(0, 160)}` : ". 프롬프트를 조금 바꿔 다시 시도해 주세요."));
+}
+async function veoVideoBlob(model, key, prompt){
+  const r = await fetch(`${API}/models/${encodeURIComponent(model)}:predictLongRunning`, {method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key},
+    body: JSON.stringify({instances:[{prompt, image:{bytesBase64Encoded: aiImage.b64, mimeType: aiImage.mime}}], parameters:{aspectRatio: vidAspect(), negativePrompt: VEO_NEG}})});
+  let op = await r.json().catch(() => ({})); if (!r.ok){ const e = new Error((op.error && op.error.message) || ("오류 " + r.status)); e.status = r.status; throw e; }
+  const t0 = Date.now();
+  while (!op.done){ if (Date.now() - t0 > 6*60e3) throw new Error("6분이 지나도 완성되지 않았어요.");
+    await new Promise(res => setTimeout(res, 8000)); const pr = await fetch(`${API}/${op.name}`, {headers:{"x-goog-api-key":key}}); op = await pr.json(); if (op.error) throw new Error(op.error.message); }
+  const resp = op.response || {}; const sample = (resp.generateVideoResponse && resp.generateVideoResponse.generatedSamples || resp.generatedVideos || [])[0];
+  const uri = sample && sample.video && (sample.video.uri || sample.video.url); if (!uri) throw new Error("영상 결과를 찾지 못했어요.");
+  let vr; try { vr = await fetch(uri, {headers:{"x-goog-api-key":key}}); if (!vr.ok) throw 0; } catch(e){ vr = await fetch(uri + (uri.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(key)); }
+  if (!vr.ok) throw new Error("영상 내려받기 실패 (" + vr.status + ")"); return await vr.blob();
+}
 async function genVideo(){
   const key = apiKey(); if (!key) { if (S.bg !== "ai") setStatus("'AI로 생성' 탭에 Gemini API 키를 먼저 넣어 주세요.", "err"); return; }
-  const b = $("#genVid"), b2 = $("#genVid2"); b.disabled = b2.disabled = true;
+  const b = $("#genVid"), b2 = $("#genVid2"); b.disabled = b2.disabled = true; let timer = 0;
   try {
     if (!aiImage){ aiMsg("먼저 ① 후보 사진을 만들거나 '내 사진·영상'에서 사진을 올려 주세요.", "err"); return; }
-    aiMsg("Veo가 고른 사진을 그대로 움직이는 중… (1~3분, 창을 닫지 마세요)"); setStatus("Veo 영상 생성 중…");
-    const prompt = VEO_LOCK + $("#vidPrompt").value;
-    const {j} = await callModels(modelList("#vidModel", VID_MODELS[S.veo] || VID_MODELS.fast), "predictLongRunning",
-      {instances:[{prompt, image:{bytesBase64Encoded: aiImage.b64, mimeType: aiImage.mime}}], parameters:{aspectRatio: vidAspect(), negativePrompt: VEO_NEG}}, key);
-    let op = j; const t0 = Date.now();
-    while (!op.done){ if (Date.now() - t0 > 6*60e3) throw new Error("6분이 지나도 완성되지 않았어요. 잠시 후 다시 시도해 주세요.");
-      await new Promise(r => setTimeout(r, 8000)); aiMsg(`Veo 영상 생성 중… ${Math.round((Date.now()-t0)/1000)}초 경과`);
-      const pr = await fetch(`${API}/${op.name}`, {headers:{"x-goog-api-key":key}}); op = await pr.json(); if (op.error) throw new Error(op.error.message); }
-    if (op.error) throw new Error(op.error.message);
-    const resp = op.response || {}; const sample = (resp.generateVideoResponse && resp.generateVideoResponse.generatedSamples || resp.generatedVideos || [])[0];
-    const uri = sample && sample.video && (sample.video.uri || sample.video.url);
-    if (!uri) throw new Error("영상 결과를 찾지 못했어요. (안전 필터에 걸렸을 수 있어요) 프롬프트를 바꿔 다시 시도해 주세요.");
-    aiMsg("영상을 내려받는 중…");
-    let vr; try { vr = await fetch(uri, {headers:{"x-goog-api-key":key}}); if (!vr.ok) throw 0; } catch(e){ vr = await fetch(uri + (uri.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(key)); }
-    if (!vr.ok) throw new Error("영상 내려받기 실패 (" + vr.status + ")");
-    const blob = await vr.blob(); await useVideoBlob(blob); aiMsg("AI 영상 배경 완성! 미리보기를 재생해 보세요.", "ok"); setStatus("Veo 영상 배경을 넣었어요. 미리보기를 재생해 보세요.", "ok");
-  } catch(e){ aiMsg(netErr(e), "err"); setStatus(netErr(e), "err"); } finally { b.disabled = b2.disabled = false; }
+    const prompt = VEO_LOCK + $("#vidPrompt").value + ` Vertical ${vidAspect()} framing, about 8 seconds, no audio needed.`;
+    const t0 = Date.now(); const tick = () => { const sec = Math.round((Date.now() - t0) / 1000); aiMsg(`AI가 고른 사진을 그대로 움직이는 중… ${sec}초 경과 (1~3분, 창을 닫지 마세요)`); setStatus(`AI 영상 생성 중… ${sec}초`); };
+    tick(); timer = setInterval(tick, 1000);
+    let blob = null, used = "", last = null;
+    for (const m of modelList("#vidModel", VID_MODELS[S.veo] || VID_MODELS.best)){
+      try {
+        if (m.startsWith("veo")) blob = await veoVideoBlob(m, key, prompt);
+        else {
+          const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 8*60e3);
+          const r = await fetch(`${API}/models/${encodeURIComponent(m)}:generateContent`, {method:"POST", signal: ctl.signal, headers:{"Content-Type":"application/json","x-goog-api-key":key},
+            body: JSON.stringify({contents:[{role:"user", parts:[{inlineData:{mimeType: aiImage.mime, data: aiImage.b64}}, {text: prompt}]}], generationConfig:{responseModalities:["VIDEO"], imageConfig:{aspectRatio: vidAspect()}}})}).finally(() => clearTimeout(to));
+          const j = await r.json().catch(() => ({})); if (!r.ok){ const e = new Error((j.error && j.error.message) || ("오류 " + r.status)); e.status = r.status; throw e; }
+          blob = await omniVideoBlob(j, key);
+        }
+        used = m; break;
+      } catch(e){ last = e; if (e.name === "AbortError") throw new Error("8분이 지나도 응답이 없어요. 잠시 후 다시 시도해 주세요.");
+        if (e.status === 404 || /not found|not supported|is not available/i.test(e.message || "")) continue; throw e; }
+    }
+    if (!blob) throw last || new Error("이 키로 쓸 수 있는 영상 모델이 없어요.");
+    await useVideoBlob(blob); aiMsg(`AI 영상 배경 완성! (${used}) 미리보기를 재생해 보세요.`, "ok"); setStatus("AI 영상 배경을 넣었어요. 미리보기를 재생해 보세요.", "ok");
+  } catch(e){ aiMsg(netErr(e), "err"); setStatus(netErr(e), "err"); } finally { clearInterval(timer); b.disabled = b2.disabled = false; }
 }
 $("#genImg").onclick = genImage; $("#genVid").onclick = genVideo; $("#genVid2").onclick = genVideo;
-S.veo = S.veo || "fast";
+S.veo = (S.veo === "fast" || S.veo === "best") ? S.veo : "best";
 try { const k = localStorage.getItem("gyv-key"); if (k) { $("#apiKey").value = k; $("#rememberKey").checked = true; } } catch(e){}
 function keyPersist(){ try { if ($("#rememberKey").checked) localStorage.setItem("gyv-key", $("#apiKey").value.trim()); else localStorage.removeItem("gyv-key"); } catch(e){} }
 $("#rememberKey").onchange = keyPersist; $("#apiKey").onchange = keyPersist;
@@ -1087,7 +1115,7 @@ $("#bgFile").onchange = async e => { const f = e.target.files[0]; if (!f) return
     if (f.type.startsWith("video")) { await useVideoBlob(f); setStatus("배경 영상을 불러왔어요.", "ok"); return; }
     const dataUrl = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(f); });
     const m = /^data:([^;]+);base64,(.*)$/.exec(dataUrl); if (m) aiImage = {mime: m[1], b64: m[2]};
-    await useImageUrl(dataUrl); setStatus("사진을 불러왔어요. 'Veo로 움직이기'를 누르면 이 사진 그대로 영상이 됩니다.", "ok");
+    await useImageUrl(dataUrl); setStatus("사진을 불러왔어요. 'AI로 움직이기'를 누르면 이 사진 그대로 영상이 됩니다.", "ok");
   } catch(err){ setStatus(err.message || "파일을 열 수 없어요.", "err"); } };
 $("#musicFile").onchange = async e => { const f = e.target.files[0]; if (!f) return; try { userMusic = await ac().decodeAudioData(await f.arrayBuffer()); setStatus("내 음악을 넣었어요. 영상 길이에 맞춰 앞부분이 쓰이고 끝은 서서히 줄어듭니다.", "ok"); } catch(err){ setStatus("음악 파일을 읽지 못했어요.", "err"); } };
 
