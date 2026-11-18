@@ -311,6 +311,29 @@ Deno.serve(async (req) => {
         return json({ items: parseJson(r.text, [] as unknown[]), cost_usd: r.cost });
       }
 
+      // ④-2 그래프마스터: 자료 속 표 → 차트용 숫자 표(JSON)
+      case "extract_table": {
+        const focus = String(body.focus ?? "").slice(0, 300);
+        const r = await callClaude(
+          sb,
+          user.id,
+          "extract_table",
+          "claude-haiku-5-5",
+          `문서 텍스트에서 차트로 그릴 핵심 숫자 표 1개를 찾아 JSON 객체만 출력한다. 형식:
+{"title":"표 제목","unit":"천원|원|명|건|% 등","series":["계열1","계열2"],"rows":[{"label":"항목","values":[숫자,숫자]}]}
+규칙: 숫자는 쉼표 없는 숫자(음수·△는 음수). 빈 칸은 null. series 는 열 머리글(예: 2025년, 2026년).
+행은 최대 20개, 같은 수준의 항목만(관·항이 섞이면 상위 수준 우선). 합계·소계 행은 제외.
+단위는 표에 적힌 단위 그대로. 원문에 없는 숫자를 만들지 않는다.${focus ? `
+사용자 요청: ${focus}` : ""}`,
+          String(body.text ?? "").slice(0, 30000),
+          4000,
+        );
+        const t = parseJson(r.text, null as null | Record<string, unknown>);
+        if (!t || !Array.isArray(t.rows) || !t.rows.length)
+          return json({ error: "표를 찾지 못했습니다. 쪽 범위를 바꾸거나 붙여넣기로 입력해 주세요." }, 422);
+        return json({ table: t, cost_usd: r.cost });
+      }
+
       // ⑤ 규정 조문 분해 → JSON
       case "split_articles": {
         const r = await callClaude(
