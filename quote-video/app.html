@@ -995,18 +995,31 @@ async function makeVideo(){
   const q = S.q; setScale(q); lineCache.clear();
   const a = ac(); try { await a.resume(); } catch(e){}
   const dest = a.createMediaStreamDestination();
-  const stream = cv.captureStream(30);
-  const run = startMusic([dest, a.destination], S.dur);
-  if (run) dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
+  // 프레임을 직접 넣는 방식: 녹화 시작과 동시에 첫 화면이 기록되어 검은 화면이 생기지 않음
+  let stream = cv.captureStream(0); const vtrack = stream.getVideoTracks()[0]; const manual = !!(vtrack && typeof vtrack.requestFrame === "function");
+  if (!manual) stream = cv.captureStream(30);
+  const push = () => { if (manual) vtrack.requestFrame(); };
+  const willMusic = !!userMusic || (S.music === "auto" ? sceneOf(S.scene).mood : S.music) !== "none";
+  if (willMusic) dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
   const mime = pickMime(); let rec;
   try { rec = new MediaRecorder(stream, mime ? {mimeType: mime, videoBitsPerSecond: q >= 1 ? 16e6 : 8e6, audioBitsPerSecond: 192000} : undefined); }
   catch(e){ recording = false; btn.disabled = false; setScale(.5); setStatus("녹화를 시작하지 못했어요: " + e.message, "err"); return; }
   const chunks = []; rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
   const done = new Promise(r => rec.onstop = r);
-  if (src.type === "video"){ src.el.currentTime = 0; await src.el.play().catch(()=>{}); }
-  frame(0); rec.start(250); const t0 = performance.now();
+  // 배경 영상은 첫 프레임이 준비될 때까지 기다린 뒤 시작
+  if (src.type === "video"){ const v = src.el; v.pause();
+    await new Promise(res => { const ok = () => { v.removeEventListener("seeked", ok); res(); }; v.addEventListener("seeked", ok); v.currentTime = 0; setTimeout(ok, 1500); });
+    if (v.readyState < 2) await new Promise(res => { v.addEventListener("loadeddata", res, {once:true}); setTimeout(res, 1500); }); }
+  frame(0); push(); await new Promise(r => requestAnimationFrame(r)); frame(0); push();
+  rec.start(250);
+  // 첫 화면을 0.2초 먼저 기록해 두어 재생하자마자 그림이 보이게 함
+  const pre = performance.now(); await new Promise(res => { const hold = () => { frame(0); push(); if (performance.now() - pre >= 200) return res(); requestAnimationFrame(hold); }; requestAnimationFrame(hold); });
+  if (src.type === "video") await src.el.play().catch(()=>{});
+  const run = willMusic ? startMusic([dest, a.destination], S.dur) : null;
+  const t0 = performance.now(); let lastPush = 0;
   setStatus("녹화 중… 화면을 켜 둔 채 기다려 주세요.");
-  await new Promise(res => { const tick = () => { const t = (performance.now() - t0) / 1000; frame(Math.min(t, S.dur)); showTime(Math.min(t, S.dur)); $("#barFill").style.width = clamp(t / S.dur * 100, 0, 100) + "%"; if (t >= S.dur + .15) return res(); requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
+  await new Promise(res => { const tick = (now) => { const t = (performance.now() - t0) / 1000; frame(Math.min(t, S.dur)); if (!manual || performance.now() - lastPush >= 1000/30 - 2){ push(); lastPush = performance.now(); }
+    showTime(Math.min(t, S.dur)); $("#barFill").style.width = clamp(t / S.dur * 100, 0, 100) + "%"; if (t >= S.dur + .15) return res(); requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
   rec.stop(); await done; stopMusic(run); if (src.type === "video") src.el.pause();
   recording = false; btn.disabled = false; setScale(.5); lineCache.clear(); showTime(restT()); drawStill();
   const type = (rec.mimeType || mime || "video/webm").split(";")[0]; const ext = type.includes("mp4") ? "mp4" : "webm";
