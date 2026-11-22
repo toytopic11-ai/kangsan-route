@@ -84,8 +84,16 @@ body.pv-big{--pv-h:58vh}
 .status.ok{color:var(--ok)}.status.err{color:var(--warn)}
 .bar{width:100%;max-width:560px;height:6px;border-radius:6px;background:var(--panel2);overflow:hidden}
 .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
-#result{width:100%;max-width:560px;display:flex;flex-direction:column;gap:8px;align-items:center}
-#result video{max-width:100%;max-height:50vh;border-radius:10px;border:1px solid var(--line)}
+/* 완성 화면: 기기와 상관없이 화면 위에 띄우고, 닫으면 편집 화면으로 돌아감 */
+#result{position:fixed;inset:0;z-index:60;background:rgba(8,8,8,.86);display:flex;align-items:center;justify-content:center;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+#result .sheet{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;align-items:center;width:100%;max-width:460px;max-height:100%;overflow:auto}
+#result h3{margin:0;font-size:17px}
+#result video{max-width:100%;max-height:56vh;border-radius:10px;border:1px solid var(--line);background:#000}
+#result .fname{font-size:12px;color:var(--muted);word-break:break-all;text-align:center}
+#result .acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+#result .acts .btn{width:100%}
+#result .acts .wide{grid-column:1/-1}
 .controls{display:flex;flex-direction:column;gap:14px;min-width:0}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
 .panel h2{margin:0;font-size:15px;font-weight:700;display:flex;align-items:baseline;gap:8px;justify-content:space-between;flex-wrap:wrap}
@@ -163,6 +171,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
       </div>
       <div class="cta">
         <button class="btn primary" id="makeBtn" type="button">영상 만들기 (MP4 저장)</button>
+        <button class="btn small" id="reopenResult" type="button" hidden>완성 영상 보기</button>
       </div>
       <div class="bar" aria-hidden="true"><i id="barFill"></i></div>
       <p class="status" id="status">미리보기 재생을 누르면 음악과 함께 움직임을 확인할 수 있어요.</p>
@@ -1004,10 +1013,27 @@ async function makeVideo(){
   const blob = new Blob(chunks, {type}); const d = new Date(); const pad = n => String(n).padStart(2, "0");
   markUsed();
   lastBlob = blob; lastName = `kangsan_quote_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.${ext}`;
-  const box = $("#result"); box.innerHTML = ""; const v = document.createElement("video"); v.src = URL.createObjectURL(blob); v.controls = true; v.playsInline = true; box.appendChild(v);
-  const again = document.createElement("button"); again.className = "btn small"; again.type = "button"; again.textContent = "이 영상 다시 저장하기"; again.onclick = () => save(); box.appendChild(again); box.hidden = false;
+  showResult(blob);
   await save(ext);
 }
+let resultUrl = null;
+function showResult(blob){
+  const box = $("#result"); box.innerHTML = ""; if (resultUrl) URL.revokeObjectURL(resultUrl); resultUrl = URL.createObjectURL(blob);
+  const sh = document.createElement("div"); sh.className = "sheet"; sh.setAttribute("role", "dialog"); sh.setAttribute("aria-modal", "true"); sh.setAttribute("aria-label", "완성된 영상");
+  const h = document.createElement("h3"); h.textContent = "영상 완성!"; sh.appendChild(h);
+  const v = document.createElement("video"); v.src = resultUrl; v.controls = true; v.playsInline = true; v.loop = true; sh.appendChild(v);
+  const fn = document.createElement("div"); fn.className = "fname"; fn.textContent = `${lastName} · ${(blob.size/1048576).toFixed(1)}MB`; sh.appendChild(fn);
+  const acts = document.createElement("div"); acts.className = "acts";
+  const mk = (txt, cls, fn2) => { const b = document.createElement("button"); b.type = "button"; b.className = "btn " + cls; b.textContent = txt; b.onclick = fn2; acts.appendChild(b); return b; };
+  mk("다시 저장", "small", () => save());
+  mk("편집 계속하기", "small", () => closeResult());
+  mk("새 글로 새 영상 만들기", "primary wide", () => { closeResult(); $("#libStatus").value = "unused"; renderLib(); const lp = $("#libPanel"); if (lp) lp.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block:"start"}); setStatus("새 글을 고르세요. '오늘의 글 뽑기'를 누르면 아직 안 만든 글이 바로 들어가요.", "ok"); });
+  sh.appendChild(acts); box.appendChild(sh); box.hidden = false; $("#reopenResult").hidden = false;
+  box.onclick = e => { if (e.target === box) closeResult(); };
+  setTimeout(() => acts.querySelector("button:nth-child(2)").focus(), 50);
+}
+function closeResult(){ const box = $("#result"); const v = box.querySelector("video"); if (v) v.pause(); box.hidden = true; }
+addEventListener("keydown", e => { if (e.key === "Escape" && !$("#result").hidden) closeResult(); });
 async function save(ext){
   if (!lastBlob) return; const r = await offerFile(lastBlob, lastName);
   const mb = (lastBlob.size / 1048576).toFixed(1);
@@ -1467,6 +1493,7 @@ document.querySelectorAll(".secnav a").forEach(a => a.addEventListener("click", 
 document.querySelector(".grid").addEventListener("change", e => { if ($("#loopPv").checked && !playing && !recording && !e.target.closest(".stage")) play(); });
 document.querySelector(".grid").addEventListener("click", e => { if ($("#loopPv").checked && !recording && e.target.closest(".controls button, .controls .scene, .controls .chip")) setTimeout(() => { if (!playing && $("#loopPv").checked) play(); }, 60); });
 
+$("#reopenResult").onclick = () => { if (resultUrl) { $("#result").hidden = false; } };
 // 시작
 syncInputs(); syncFonts(); syncScenes(); sel.value = S.music; scrub.max = S.dur; showBgTab(false);
 const [w0, h0] = RATIOS[S.ratio]; FW = w0; FH = h0; setScale(.5); buildPrompts(); buildBase(); showTime(restT());
