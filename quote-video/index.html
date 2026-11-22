@@ -239,6 +239,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
       <div class="panel" id="p-text">
         <h2><span><span class="step">1</span>글 넣기</span><small>Enter로 줄을 나누면 그 줄 단위로 나타나요</small></h2>
         <p class="status" id="dupNote" style="text-align:left;min-height:0"></p>
+        <label class="check"><input type="checkbox" id="fit57" checked> 글감을 고르면 5~7줄로 자동 맞춤</label>
         <label class="f">본문
           <textarea id="text" rows="5"></textarea>
         </label>
@@ -246,7 +247,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
           <label class="f">저자 <input type="text" id="author" placeholder="예) 안중근"></label>
           <label class="f">출처·직함 <input type="text" id="source" placeholder="예) <한 번은 독해져라>, 작가"></label>
         </div>
-        <label class="f">상단 브랜드 표시 (비우면 숨김) <input type="text" id="brand" placeholder="예) 강산부동산"></label>
+        <label class="f">하단 브랜드 표시 (화면 맨 아래 · 비우면 숨김) <input type="text" id="brand" placeholder="예) 강산부동산"></label>
         <div class="tabs">
           <button class="btn small" id="autoBreak" type="button">자동 줄나눔</button>
           <button class="btn small" id="suggest" type="button">글에 어울리는 장면 추천</button>
@@ -368,7 +369,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
         <label class="f">색감
           <div class="seg" id="gradeSeg" role="group" aria-label="색감"></div>
         </label>
-        <div class="slider"><span>상단 밝게</span><input type="range" id="haze" min="0" max="0.8" step="0.01" value="0.32"><output id="hazeo">32%</output></div>
+        <div class="slider"><span>글 뒤 밝게</span><input type="range" id="haze" min="0" max="0.8" step="0.01" value="0.38"><output id="hazeo">38%</output></div>
         <div class="slider"><span>빛 번짐</span><input type="range" id="bloom" min="0" max="0.6" step="0.01" value="0.18"><output id="bloomo">18%</output></div>
         <div class="slider"><span>필름 입자</span><input type="range" id="grain" min="0" max="0.25" step="0.01" value="0.07"><output id="graino">7%</output></div>
         <label class="check"><input type="checkbox" id="fadeOut"> 끝에서 글이 서서히 사라지기</label>
@@ -588,14 +589,14 @@ const ANIMS = [["write","손글씨 쓰듯"],["fadeup","아래서 떠오르기"],
 const MOTIONS = [["in","천천히 다가가기"],["out","천천히 멀어지기"],["pan","옆으로 흐르기"],["none","고정"]];
 const GRADES = [["scene","장면 기본"],["natural","자연"],["warm","따뜻한"],["film","필름"],["calm","차분한"],["mono","흑백"]];
 const GRADE_FILTER = {natural:"saturate(1.02) contrast(1.0)", warm:"saturate(0.92) sepia(0.12) brightness(1.03) contrast(0.96)", film:"saturate(0.8) contrast(0.9) brightness(1.04) sepia(0.07)", calm:"saturate(0.72) contrast(0.9) brightness(1.06)", mono:"grayscale(1) contrast(0.94) brightness(1.05)"};
-const RATIOS = {"9:16":[1080,1920,.165], "4:5":[1080,1350,.14], "1:1":[1080,1080,.14], "16:9":[1920,1080,.17]};
+const RATIOS = {"9:16":[1080,1920,.12], "4:5":[1080,1350,.09], "1:1":[1080,1080,.08], "16:9":[1920,1080,.09]};
 const MUSIC = {
   auto:"자동 (장면에 맞춤)", piano:"잔잔한 피아노", pad:"따뜻한 앰비언트", night:"새벽 감성", hope:"희망의 아침", musicbox:"오르골", none:"음악 없음"
 };
 
 /* ---------------- 상태 ---------------- */
 const S = {text:SAMPLES[0].t, author:SAMPLES[0].a, source:SAMPLES[0].s, brand:"강산부동산", libCat:"all", libFeel:"all",
-  scene:"beach", bloom:.18, imgQ:"best", font:FONTS[0].f, anim:"write", motion:"in", grade:"scene", haze:.32, grain:.07, ink:"auto",
+  scene:"beach", bloom:.18, imgQ:"best", font:FONTS[0].f, anim:"write", motion:"in", grade:"scene", haze:.38, grain:.07, ink:"auto",
   size:1, asize:1, lh:1, pos:"top", focusY:.6, ratio:"9:16", dur:10, music:"auto", vol:.7, fadeOut:false, q:1, bg:"ai"};
 const SAVE_KEYS = ["fSeason","fFeel","veo","bloom","imgQ","text","author","source","brand","scene","font","anim","motion","grade","haze","grain","ink","size","asize","lh","pos","ratio","dur","music","vol","fadeOut","q"];
 try { const saved = JSON.parse(localStorage.getItem("gyv-state") || "null"); if (saved) for (const k of SAVE_KEYS) if (k in saved) S[k] = saved[k]; } catch(e) {}
@@ -732,6 +733,11 @@ function sampleInk(){
     const L = layout(); const y0 = clamp(Math.floor(L.top/FH*64),0,63), y1 = clamp(Math.ceil(L.bottom/FH*64),y0+1,64);
     const d = g.getImageData(4, y0, 28, y1-y0).data; let sum = 0; for (let i=0;i<d.length;i+=4) sum += (d[i]*.2126+d[i+1]*.7152+d[i+2]*.0722)/255;
     inkMode.lum = sum/(d.length/4); inkMode.dark = inkMode.lum > .42;
+    const db = g.getImageData(4, 56, 28, 8).data; let sb = 0; for (let i=0;i<db.length;i+=4) sb += (db[i]*.2126+db[i+1]*.7152+db[i+2]*.0722)/255;
+    inkMode.botLum = sb/(db.length/4);
+    // 저자 줄 자리의 밝기 (본문과 배경이 다를 수 있어 따로 판단)
+    const ay = clamp(Math.round(L.aY/FH*64) - 1, 0, 61); const da = g.getImageData(6, ay, 24, 3).data; let sa = 0; for (let i=0;i<da.length;i+=4) sa += (da[i]*.2126+da[i+1]*.7152+da[i+2]*.0722)/255;
+    inkMode.authLum = sa/(da.length/4);
   } catch(e) { inkMode.dark = true; }
 }
 function inkDark(){ return S.ink === "auto" ? inkMode.dark : S.ink === "dark"; }
@@ -754,28 +760,37 @@ function layout(){
   let size = narrow * .072 * F.k * S.size; const maxW = FW * .86; let lines = [];
   const user = S.text.split("\n").map(s => s.trim()).filter(Boolean);
   for (let i=0;i<10;i++){ g.font = fontCss(size, F.f); lines = []; user.forEach(l => lines.push(...wrapLine(g, l, maxW)));
-    if (lines.length * size * 1.6 * S.lh < FH * .52 || size < narrow*.03) break; size *= .92; }
-  const lh = size * 1.6 * S.lh;
-  const aSize = narrow * .034 * S.asize; const aText = authorLine();
-  const blockH = lines.length * lh + (aText ? aSize * 2.2 : 0);
-  const top = S.pos === "top" ? FH * RATIOS[S.ratio][2] : (FH - blockH) / 2 - FH*.04;
-  const bSize = narrow * .026;
+    if ((lines.length + 1.4) * size * 1.55 * S.lh < FH * .6 || size < narrow*.03) break; size *= .94; }
+  const lh = size * 1.55 * S.lh;
+  const aSize = narrow * .037 * S.asize; const aText = authorLine();
+  // 저자: 본문 마지막 줄 다음에 빈 줄 하나를 두고 표시
+  const gapLine = lh * 1.0;
+  const blockH = lines.length * lh + (aText ? gapLine + aSize * 1.2 : 0);
+  const top = S.pos === "top" ? FH * RATIOS[S.ratio][2] : (FH - blockH) / 2 - FH*.03;
+  const bSize = narrow * .03;
   g.restore();
-  layoutCache = {size, lh, lines: lines.map((t,i) => ({t, y: top + lh*(i+.5)})), aText, aSize, aY: top + lines.length*lh + aSize*1.0,
-    badgeY: top - bSize*2.2, bSize, top: top - bSize*3, bottom: top + blockH};
+  layoutCache = {size, lh, lines: lines.map((t,i) => ({t, y: top + lh*(i+.5)})), aText, aSize, aY: top + lines.length*lh + gapLine*.5 + aSize*.75,
+    badgeY: FH - Math.max(bSize*2.4, FH*.05), bSize, top: top - size*.7, bottom: top + blockH};
   layoutKey = key; return layoutCache;
 }
 
 /* ---------------- 프레임 그리기 ---------------- */
 const lineCache = new Map();
+// 선명한 글씨 그리기: ① 은은한 빛번짐 ② 또렷한 반투명 외곽선 ③ 같은 색 얇은 선으로 획을 살짝 굵게
+function paintInk(g, text, x, y, size, dark, blurScale){
+  const ink = dark ? "#111012" : "#ffffff", halo = dark ? "255,255,255" : "0,0,0";
+  g.lineJoin = "round"; g.miterLimit = 2;
+  g.save(); g.shadowColor = `rgba(${halo},${dark ? .85 : .6})`; g.shadowBlur = size*.32*blurScale; g.fillStyle = ink; g.fillText(text, x, y); g.restore();
+  g.save(); g.strokeStyle = `rgba(${halo},${dark ? .55 : .42})`; g.lineWidth = size*.075; g.strokeText(text, x, y); g.restore();
+  g.save(); g.fillStyle = ink; g.strokeStyle = ink; g.lineWidth = size*.022; g.strokeText(text, x, y); g.fillText(text, x, y); g.restore();
+}
 function lineCanvas(text, size, fam, dark){
   const key = [text,size,fam,dark].join("|"); if (lineCache.has(key)) return lineCache.get(key);
   if (lineCache.size > 160) lineCache.clear();
   const c = document.createElement("canvas"); const g = c.getContext("2d"); g.font = fontCss(size, fam);
   const w = g.measureText(text).width, pad = size*.6; c.width = Math.ceil(w + pad*2); c.height = Math.ceil(size*2);
   g.font = fontCss(size, fam); g.textBaseline = "middle"; g.textAlign = "left";
-  g.shadowColor = dark ? "rgba(255,255,255,.55)" : "rgba(0,0,0,.45)"; g.shadowBlur = size*.28;
-  g.fillStyle = dark ? "#1c1b1d" : "#fbfaf6"; g.fillText(text, pad, c.height/2);
+  paintInk(g, text, pad, c.height/2, size, dark, 1);
   const o = {c, w, pad}; lineCache.set(key, o); return o;
 }
 const tmpC = document.createElement("canvas"); const tmpG = tmpC.getContext("2d");
@@ -833,9 +848,10 @@ function drawText(t, L){
     if (a > 0){ ctx.save(); ctx.globalAlpha = a; ctx.font = fontCss(L.bSize, AUTHOR_FONT); const tw = ctx.measureText(S.brand.trim()).width;
       const w = tw + L.bSize*1.8, h = L.bSize*1.85, x = FW/2 - w/2, y = L.badgeY - h/2;
       ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x,y,w,h,h/2); else ctx.rect(x,y,w,h);
-      ctx.fillStyle = dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.18)"; ctx.fill();
-      ctx.lineWidth = Math.max(1.5, L.bSize*.07); ctx.strokeStyle = dark ? "rgba(40,40,40,.45)" : "rgba(255,255,255,.6)"; ctx.stroke();
-      ctx.fillStyle = dark ? "rgba(40,40,40,.62)" : "rgba(255,255,255,.85)"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(S.brand.trim(), FW/2, L.badgeY + L.bSize*.05);
+      const lightBg = (inkMode.botLum ?? .5) > .5;
+      ctx.fillStyle = lightBg ? "rgba(255,255,255,.55)" : "rgba(0,0,0,.38)"; ctx.fill();
+      ctx.lineWidth = Math.max(1.5, L.bSize*.07); ctx.strokeStyle = lightBg ? "rgba(30,30,30,.35)" : "rgba(255,255,255,.55)"; ctx.stroke();
+      ctx.fillStyle = lightBg ? "rgba(25,25,25,.85)" : "rgba(255,255,255,.95)"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(S.brand.trim(), FW/2, L.badgeY + L.bSize*.05);
       ctx.restore(); }
   }
   L.lines.forEach((ln, i) => {
@@ -852,9 +868,8 @@ function drawText(t, L){
     } else if (S.anim === "type" && p < 1){
       const chars = Array.from(ln.t); const k = p * chars.length; const full = Math.floor(k);
       ctx.font = fontCss(L.size, F.f); ctx.textBaseline = "middle"; ctx.textAlign = "left";
-      ctx.shadowColor = dark ? "rgba(255,255,255,.55)" : "rgba(0,0,0,.45)"; ctx.shadowBlur = L.size*.28*K; ctx.fillStyle = dark ? "#1c1b1d" : "#fbfaf6";
-      const sx = FW/2 - lc.w/2; const shown = chars.slice(0, full).join(""); ctx.fillText(shown, sx, ln.y);
-      if (full < chars.length){ ctx.globalAlpha *= k - full; ctx.fillText(chars[full], sx + ctx.measureText(shown).width, ln.y); }
+      const sx = FW/2 - lc.w/2; const shown = chars.slice(0, full).join(""); if (shown) paintInk(ctx, shown, sx, ln.y, L.size, dark, K);
+      if (full < chars.length){ ctx.globalAlpha *= k - full; paintInk(ctx, chars[full], sx + ctx.measureText(shown).width, ln.y, L.size, dark, K); }
     } else if (S.anim === "fadeup" && p < 1){
       const e = easeOut(p); ctx.globalAlpha *= e; ctx.drawImage(lc.c, x, y + (1-e)*L.size*.45);
     } else if (S.anim === "blur" && p < 1){
@@ -865,10 +880,13 @@ function drawText(t, L){
     ctx.restore();
   });
   if (L.aText){
+    const dark = S.ink === "auto" ? (inkMode.authLum ?? inkMode.lum ?? 1) > .42 : inkDark();
     const a = clamp((t - (S.anim === "all" ? 2.2 : T.authorAt)) / .8, 0, 1) * outA;
     if (a > 0){ ctx.save(); ctx.globalAlpha = a; ctx.font = fontCss(L.aSize, AUTHOR_FONT); ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.shadowColor = dark ? "rgba(255,255,255,.5)" : "rgba(0,0,0,.4)"; ctx.shadowBlur = L.aSize*.3*K;
-      ctx.fillStyle = dark ? "rgba(48,46,48,.82)" : "rgba(255,255,255,.88)"; ctx.fillText(L.aText, FW/2, L.aY + (1-easeOut(a))*L.aSize*.3); ctx.restore(); }
+      const ay = L.aY + (1-easeOut(a))*L.aSize*.3; ctx.lineJoin = "round";
+      ctx.save(); ctx.shadowColor = dark ? "rgba(255,255,255,.8)" : "rgba(0,0,0,.55)"; ctx.shadowBlur = L.aSize*.35*K; ctx.fillStyle = dark ? "#2a282b" : "#ffffff"; ctx.fillText(L.aText, FW/2, ay); ctx.restore();
+      ctx.strokeStyle = dark ? "rgba(255,255,255,.5)" : "rgba(0,0,0,.4)"; ctx.lineWidth = L.aSize*.09; ctx.strokeText(L.aText, FW/2, ay);
+      ctx.fillStyle = dark ? "#2a282b" : "#ffffff"; ctx.fillText(L.aText, FW/2, ay); ctx.restore(); }
   }
 }
 function frame(t){
@@ -1183,10 +1201,21 @@ async function copyText(el, btn){ try { await navigator.clipboard.writeText(el.v
 $("#copyImg").onclick = e => copyText($("#imgPrompt"), e.currentTarget); $("#copyVid").onclick = e => copyText($("#vidPrompt"), e.currentTarget);
 
 /* ---------------- 줄나눔 · 장면 추천 ---------------- */
-function autoBreak(text){ const words = text.replace(/\s*\n\s*/g, " ").trim().split(/\s+/).filter(Boolean); const total = words.join(" ").length; if (!total) return text;
-  const n = Math.max(1, Math.round(total / 14)); const target = total / n; const lines = []; let cur = "";
-  words.forEach(w => { const t = cur ? cur + " " + w : w; if (cur && t.length > target * 1.2) { lines.push(cur); cur = w; } else cur = t; if (/[,.!?…]$/.test(cur) && cur.length > target * .6) { lines.push(cur); cur = ""; } });
-  if (cur) lines.push(cur); return lines.join("\n"); }
+function autoBreak(text, minL = 5, maxL = 7){
+  const words = text.replace(/\s*\n\s*/g, " ").trim().split(/\s+/).filter(Boolean); if (!words.length) return text;
+  const total = words.join(" ").length;
+  // 줄 수: 5~7줄 (아주 짧은 글은 억지로 쪼개지 않도록 한 줄 최소 5글자 정도 유지)
+  let n = clamp(Math.round(total / 11), minL, maxL); n = Math.min(n, words.length, Math.max(1, Math.floor(total / 5)));
+  const target = total / n; const W = words.length; const len = (i, j) => words.slice(i, j).join(" ").length;
+  // 끊기 좋은 곳: 문장부호, 연결 어미(~고 ~며 ~면 ~서 ~지만 ~는데 ~도 ~을/를 ~은/는)
+  const good = i => /[,.!?…·]$/.test(words[i-1]) ? -8 : /(고|며|면|서|지만|는데|도|니|게|면서)$/.test(words[i-1]) ? -3 : /(을|를|은|는|이|가|에|의|와|과)$/.test(words[i-1]) ? 2 : 0;
+  const INF = 1e9; const dp = Array.from({length: n+1}, () => new Array(W+1).fill(INF)); const prev = Array.from({length: n+1}, () => new Array(W+1).fill(-1)); dp[0][0] = 0;
+  for (let k = 1; k <= n; k++) for (let j = k; j <= W; j++) for (let i = k-1; i < j; i++){ if (dp[k-1][i] >= INF) continue;
+    const d = len(i, j) - target; const c = dp[k-1][i] + d*d + (j < W ? good(j) : 0); if (c < dp[k][j]){ dp[k][j] = c; prev[k][j] = i; } }
+  const lines = []; let j = W; for (let k = n; k >= 1; k--){ const i = prev[k][j]; lines.unshift(words.slice(i, j).join(" ")); j = i; }
+  return lines.join("\n");
+}
+function fitLines(t){ const c = String(t || "").split("\n").filter(x => x.trim()).length; return (c < 5 || c > 7) ? autoBreak(t) : t; }
 const HINTS = [["beach",/노을|해변|산책/],["beachrun",/달려|달리|뛰|도전|포기/],["sunrise",/새해|일출|해돋이|시작|아침/],["pier",/듣|대화|이해|말/],["wintersea",/외로|혼자|견디|버티/],["tidal",/아버지|아빠|자식|아이/],["whale",/고래|칭찬|아첨/],
   ["ferry",/강|건너|세월|흘러/],["lakemist",/고요|침묵|마음|비우/],["lakebench",/친구|곁에|함께|동행|부부/],["lake",/여행|탐험|풍경|새로운/],["hill",/변화|서로|사람들|관계/],
   ["hikeclouds",/오르|올라|한 걸음|걸음|노력/],["summit",/정상|능력|인격|성공/],["snowtrail",/겨울|추위|시련|고난|눈길/],["temple",/평화|욕심|내려놓|비움|수행/],["city",/흔들|독해|약속|도시|밤/],
@@ -1309,7 +1338,7 @@ function renderLib(){
   });
 }
 function loadItem(x){
-  stop(); S.text = x.t; S.author = x.a; S.source = x.s; syncInputs(); persist();
+  stop(); S.text = $("#fit57").checked ? fitLines(x.t) : x.t; S.author = x.a; S.source = x.s; syncInputs(); persist();
   if ($("#libAutoScene").checked) suggestScene(true);
   fontsReady().then(() => refresh(true)); checkDup();
   const top = document.querySelector(".stage"); if (top && window.innerWidth < 960) top.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
@@ -1377,7 +1406,7 @@ $("#aiSuggest").onclick = async () => {
 규칙:
 - 공자·노자·맹자·석가·소크라테스 등 고대 성현의 말, 사자성어, 속담 같은 고전 명언은 절대 넣지 마세요.
 - 실제로 존재하는 문장만. 지어낸 문장 금지. 저자·작품이 조금이라도 불확실하면 verified를 false로.
-- 2~5줄, 공백 포함 70자 이내, 영상 자막용으로 의미 단위 줄바꿈(\\n).
+- 반드시 5~7줄, 한 줄 8~16자, 공백 포함 60~130자. 영상 자막용으로 의미 단위 줄바꿈(\\n).
 - 대구나 반전이 있는 문장 우선. 현대 시는 전문 대신 핵심 2줄만.
 - 아래 이미 있는 글과 겹치지 않게: ${avoid}
 JSON 배열만 출력, 10개: [{"text":"...","author":"...","source":"<책 제목> 또는 드라마 〈제목〉 또는 직함","category":"책|드라마|동기부여|좋은글","feel":"평온|희망|위로|그리움|사랑|도전","verified":true}]`;
@@ -1394,7 +1423,7 @@ JSON 배열만 출력, 10개: [{"text":"...","author":"...","source":"<책 제�
     const txt = ((((j.candidates || [])[0] || {}).content || {}).parts || []).map(x => x.text || "").join("");
     let arr = []; try { arr = JSON.parse(txt.replace(/^```json|```$/g, "").trim()); } catch(e){ throw new Error("AI 답변을 읽지 못했어요. 한 번 더 눌러 주세요."); }
     let added = 0, dup = 0;
-    (Array.isArray(arr) ? arr : []).forEach(o => { const r = addItem({t:o.text, a:o.author, s:o.source, c:o.category, f:o.feel, ai:true, unverified: o.verified === false}); if (r.added) added++; else if (r.dup) dup++; });
+    (Array.isArray(arr) ? arr : []).forEach(o => { const r = addItem({t:fitLines(o.text), a:o.author, s:o.source, c:o.category, f:o.feel, ai:true, unverified: o.verified === false}); if (r.added) added++; else if (r.dup) dup++; });
     saveLib(); $("#libStatus").value = "unused"; renderLib();
     m.textContent = `${added}개를 창고에 넣었어요${dup ? ` (중복 ${dup}개 제외)` : ""}. '출처 확인 필요' 표시는 직접 확인 후 쓰세요.`; m.className = "status ok";
   } catch(e){ m.textContent = netErr(e); m.className = "status err"; } finally { b.disabled = false; }
