@@ -2,6 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.5/build/mp4-muxer.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&family=Nanum+Pen+Script&family=Hi+Melody&family=Gaegu&family=Gamja+Flower&family=East+Sea+Dokdo&family=Dokdo&family=Yeon+Sung&family=Song+Myung&family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&display=swap">
 <style>
 /* Layout: 작업대(조정판) + 고정 미리보기 화면. 어두운 편집실 한 가지 톤으로 고정. */
@@ -932,8 +933,8 @@ function voiceBox(a, out, t, m, vel){ const f = NOTE(m); const g = a.createGain(
 function voicePad(a, out, t, m, lvl, len){ const g = a.createGain(); g.gain.setValueAtTime(.0001,t); const att = t+Math.min(1.6,len*.4); g.gain.linearRampToValueAtTime(lvl, att); g.gain.setValueAtTime(lvl, Math.max(att+.01, t+len-1)); g.gain.linearRampToValueAtTime(.0001, t+len+.6);
   const lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 760; lp.Q.value = .4; lp.connect(g); g.connect(out);
   [-7,7].forEach(dt => { const o = a.createOscillator(); o.type = "sawtooth"; o.frequency.value = NOTE(m); o.detune.value = dt; o.connect(lp); o.start(t); o.stop(t+len+.8); }); }
-function startMusic(outs, dur){
-  const a = ac(); const key = S.music === "auto" ? sceneOf(S.scene).mood : S.music;
+function startMusic(outs, dur, actx){
+  const a = actx || ac(); const key = S.music === "auto" ? sceneOf(S.scene).mood : S.music;
   if (key === "none" && !userMusic) return null;
   const master = a.createGain(); const now = a.currentTime + .05; const vol = S.vol;
   master.gain.setValueAtTime(.0001, now); master.gain.linearRampToValueAtTime(vol, now + .8); master.gain.setValueAtTime(vol, now + dur - 1.6); master.gain.linearRampToValueAtTime(.0001, now + dur);
@@ -988,9 +989,82 @@ async function offerFile(blob, name){
   catch(e){ if (e && e.code === "declined") return "declined"; if (e && e.code === "rate_limited") return "busy"; }
   try { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); return "link"; } catch(e){ return "fail"; }
 }
-let lastBlob = null, lastName = "";
+let lastBlob = null, lastName = "", lastCompat = false;
+/* ---------------- 표준 MP4 만들기 (카톡·유튜브·인스타 호환) ----------------
+   H.264 영상 + AAC 소리, 조각나지 않은 일반 MP4. 실시간 녹화가 아니라 한 장면씩 계산해 만들어서 더 빠르고 정확함. */
+async function pickAvc(w, h, bitrate){
+  for (const codec of ["avc1.640033","avc1.640028","avc1.4d0033","avc1.4d0028","avc1.42003e"]){
+    const cfg = {codec, width:w, height:h, bitrate, framerate:30, avc:{format:"avc"}};
+    try { const r = await VideoEncoder.isConfigSupported(cfg); if (r && r.supported) return cfg; } catch(e){}
+  }
+  return null;
+}
+async function renderAudio(dur){
+  const key = S.music === "auto" ? sceneOf(S.scene).mood : S.music; if (key === "none" && !userMusic) return null;
+  const sr = 48000; const oac = new OfflineAudioContext(2, Math.ceil(sr * (dur + .3)), sr);
+  const run = startMusic([oac.destination], dur, oac); if (!run) return null;
+  return await oac.startRendering();
+}
+function seekVideoTo(v, t){ return new Promise(res => { if (!v.duration){ res(); return; } const tt = (t * (v.playbackRate || 1)) % v.duration;
+  if (Math.abs(v.currentTime - tt) < 0.001 && v.readyState >= 2){ res(); return; } const done = () => { v.removeEventListener("seeked", done); res(); }; v.addEventListener("seeked", done); v.currentTime = tt; setTimeout(done, 800); }); }
+async function makeVideoMP4(){
+  if (!window.Mp4Muxer || !window.VideoEncoder || !window.VideoFrame) return null;
+  const q = S.q; const W = Math.round(FW*q/2)*2, H = Math.round(FH*q/2)*2;
+  const vcfg = await pickAvc(W, H, q >= 1 ? 14e6 : 7e6); if (!vcfg) return null;
+  // 소리: AAC 인코더를 지원하는지 먼저 확인 (지원하지 않으면 기존 방식으로)
+  const audioBuf = await renderAudio(S.dur);
+  let acfg = null;
+  if (audioBuf){ if (!window.AudioEncoder) return null;
+    acfg = {codec:"mp4a.40.2", sampleRate: audioBuf.sampleRate, numberOfChannels: 2, bitrate: 192000};
+    try { const r = await AudioEncoder.isConfigSupported(acfg); if (!r || !r.supported) return null; } catch(e){ return null; } }
+  const muxer = new Mp4Muxer.Muxer({target: new Mp4Muxer.ArrayBufferTarget(), fastStart: "in-memory", firstTimestampBehavior: "offset",
+    video: {codec: "avc", width: W, height: H, frameRate: 30}, audio: acfg ? {codec: "aac", numberOfChannels: 2, sampleRate: acfg.sampleRate} : undefined});
+  let encErr = null;
+  const ve = new VideoEncoder({output: (c, m) => muxer.addVideoChunk(c, m), error: e => { encErr = e; }});
+  ve.configure(vcfg);
+  setScale(W / FW); lineCache.clear();
+  const total = Math.round(S.dur * 30); const v = src.type === "video" ? src.el : null; if (v) v.pause();
+  for (let i = 0; i < total; i++){
+    if (encErr) throw encErr;
+    const t = i / 30; if (v) await seekVideoTo(v, t);
+    frame(t);
+    const vf = new VideoFrame(cv, {timestamp: Math.round(i * 1e6 / 30), duration: Math.round(1e6 / 30)});
+    ve.encode(vf, {keyFrame: i % 60 === 0}); vf.close();
+    if (i % 3 === 0){ showTime(t); $("#barFill").style.width = (i / total * 90) + "%"; setStatus(`영상 만드는 중… ${Math.round(i / total * 100)}%`); }
+    while (ve.encodeQueueSize > 6) await new Promise(r => setTimeout(r, 4));
+    if (i % 10 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+  await ve.flush(); ve.close();
+  if (acfg){
+    setStatus("소리를 넣는 중…");
+    const ae = new AudioEncoder({output: (c, m) => muxer.addAudioChunk(c, m), error: e => { encErr = e; }}); ae.configure(acfg);
+    const sr = audioBuf.sampleRate, n = Math.min(audioBuf.length, Math.round(S.dur * sr)); const L0 = audioBuf.getChannelData(0), R0 = audioBuf.getChannelData(1); const step = 1024;
+    for (let off = 0; off < n; off += step){ const m = Math.min(step, n - off); const data = new Float32Array(m * 2); data.set(L0.subarray(off, off + m), 0); data.set(R0.subarray(off, off + m), m);
+      const ad = new AudioData({format: "f32-planar", sampleRate: sr, numberOfFrames: m, numberOfChannels: 2, timestamp: Math.round(off * 1e6 / sr), data}); ae.encode(ad); ad.close(); }
+    await ae.flush(); ae.close(); if (encErr) throw encErr;
+  }
+  muxer.finalize(); $("#barFill").style.width = "100%";
+  return new Blob([muxer.target.buffer], {type: "video/mp4"});
+}
 async function makeVideo(){
-  if (recording) return; if (!window.MediaRecorder || !cv.captureStream){ setStatus("이 브라우저는 영상 녹화를 지원하지 않아요. PC 크롬이나 엣지에서 열어 주세요.", "err"); return; }
+  if (recording) return;
+  // 1순위: 카톡 호환 표준 MP4
+  if (window.Mp4Muxer && window.VideoEncoder){
+    stop(); await fontsReady(); recording = true; const btn = $("#makeBtn"); btn.disabled = true; $("#result").hidden = true;
+    let blob = null;
+    try { blob = await makeVideoMP4(); }
+    catch(e){ console.warn(e); blob = null; setStatus("표준 MP4 만들기에 실패해 기본 방식으로 다시 만들어요…"); }
+    recording = false; btn.disabled = false; setScale(.5); lineCache.clear(); showTime(restT()); drawStill();
+    if (blob){
+      const d = new Date(); const pad = n => String(n).padStart(2, "0"); markUsed();
+      lastBlob = blob; lastName = `kangsan_quote_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.mp4`;
+      lastCompat = true; showResult(blob); await save("mp4"); return;
+    }
+  }
+  return makeVideoRealtime();
+}
+async function makeVideoRealtime(){
+  if (recording) return; lastCompat = false; if (!window.MediaRecorder || !cv.captureStream){ setStatus("이 브라우저는 영상 녹화를 지원하지 않아요. PC 크롬이나 엣지에서 열어 주세요.", "err"); return; }
   stop(); await fontsReady(); recording = true; const btn = $("#makeBtn"); btn.disabled = true; $("#result").hidden = true;
   const q = S.q; setScale(q); lineCache.clear();
   const a = ac(); try { await a.resume(); } catch(e){}
@@ -1050,7 +1124,7 @@ addEventListener("keydown", e => { if (e.key === "Escape" && !$("#result").hidde
 async function save(ext){
   if (!lastBlob) return; const r = await offerFile(lastBlob, lastName);
   const mb = (lastBlob.size / 1048576).toFixed(1);
-  if (r === "saved" || r === "link") setStatus(`완성! ${lastName} (${mb}MB)` + (lastName.endsWith("webm") ? " · 이 브라우저는 WebM으로 저장돼요. 크롬 최신판은 MP4로 저장됩니다." : ""), "ok");
+  if (r === "saved" || r === "link") setStatus(`완성! ${lastName} (${mb}MB)` + (lastCompat ? " · 카톡·유튜브·인스타 호환 MP4" : " · ⚠ 이 브라우저는 표준 MP4를 지원하지 않아 기본 방식으로 저장했어요. 카톡에서 일부만 재생될 수 있으니 크롬 최신판(PC·안드로이드)에서 만들어 주세요."), "ok");
   else if (r === "declined") setStatus("저장을 취소했어요. 아래 '다시 저장하기'로 언제든 받을 수 있어요.");
   else setStatus("자동 저장이 막혔어요. 아래 영상을 길게 누르거나 ⋮ 메뉴에서 저장해 주세요.", "err");
 }
