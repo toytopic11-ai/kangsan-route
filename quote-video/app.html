@@ -306,14 +306,9 @@ footer{color:var(--muted);font-size:12px;text-align:center}
             <button class="btn small" id="saveAllCand" type="button">4장 모두 저장</button>
           </div>
           <p class="status" id="candMsg" style="text-align:left;min-height:0"></p>
-          <label class="f">영상 품질
-            <div class="seg" id="veoSeg" role="group" aria-label="영상 품질">
-              <button type="button" data-v="best" aria-pressed="true">Omni 1.2 (최신)</button>
-              <button type="button" data-v="fast" aria-pressed="false">Omni 미리보기판</button>
-            </div>
-          </label>
+          <p class="hint">영상 모델: <b>Gemini Omni 1.2</b> (최신 · 영상 1편 약 800~1,000원)</p>
           <div class="tabs">
-            <button class="btn small" id="genVid" type="button">② 고른 사진을 움직이는 영상으로 (Omni, 1~3분)</button>
+            <button class="btn small" id="genVid" type="button">② 고른 사진을 움직이는 영상으로 (Omni 1.2, 1~3분)</button>
           </div>
           <p class="status" id="aiStatus" style="text-align:left"></p>
           <details>
@@ -456,7 +451,8 @@ const VEO_NEG = "text, letters, subtitles, captions, watermark, logo, camera pan
 const IMG_MODELS = ["gemini-3.1-flash-image","gemini-3-pro-image","gemini-2.5-flash-image","imagen-4.0-generate-001"];
 const IMG_MODELS_BEST = ["gemini-3-pro-image","nano-banana-pro-preview","gemini-3.1-flash-image","gemini-2.5-flash-image"];
 // 영상: Gemini Omni Flash 우선 (Gemini API의 Veo는 종료), Veo는 혹시 열려 있을 때만 마지막 후보로 시도
-const VID_MODELS = {best:["gemini-omni-1.2-flash","gemini-omni-flash-preview","gemini-omni-1.1-flash","veo-3.1-generate-preview"], fast:["gemini-omni-flash-preview","gemini-omni-1.2-flash","gemini-omni-1.1-flash","veo-3.1-fast-generate-preview"]};
+// 영상: Gemini Omni 1.2 고정 (1.2가 막혀 있을 때만 1.1로 자동 전환)
+const VID_MODELS = {best:["gemini-omni-1.2-flash","gemini-omni-1.1-flash"]};
 
 const SCENES = [
   // ── 바다 · 물가 ──
@@ -1283,7 +1279,7 @@ async function genVideo(){
     const t0 = Date.now(); const tick = () => { const sec = Math.round((Date.now() - t0) / 1000); aiMsg(`AI가 고른 사진을 그대로 움직이는 중… ${sec}초 경과 (1~3분, 창을 닫지 마세요)`); setStatus(`AI 영상 생성 중… ${sec}초`); };
     tick(); timer = setInterval(tick, 1000);
     let blob = null, used = "", last = null;
-    for (const m of modelList("#vidModel", VID_MODELS[S.veo] || VID_MODELS.best)){
+    for (const m of modelList("#vidModel", VID_MODELS.best)){
       try {
         if (m.startsWith("veo")) blob = await veoVideoBlob(m, key, prompt);
         else blob = await omniInteraction(m, key, prompt);
@@ -1374,7 +1370,6 @@ segment($("#durSeg"), [["10","10초"],["15","15초"],["20","20초"]], "dur", () 
 bindSeg($("#inkSeg"), "ink", () => { lineCache.clear(); refresh(); });
 bindSeg($("#posSeg"), "pos", () => { sampleInk(); refresh(); });
 bindSeg($("#qSeg"), "q");
-bindSeg($("#veoSeg"), "veo");
 bindSeg($("#imgQSeg"), "imgQ");
 bindSeg($("#bgTabs"), "bg", () => showBgTab(true));
 function showBgTab(user){ ["ai","upload","scene"].forEach(k => $("#tab-" + k).hidden = S.bg !== k); if (user && S.bg === "scene"){ stop(); src = {type:"scene"}; buildBase(); refresh(); } }
